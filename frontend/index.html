@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sibelium - Asistente Cognitivo</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar izquierdo: Sesiones -->
+        <aside class="sessions-sidebar" id="sessions-sidebar">
+            <div class="sessions-header">
+                <span class="sessions-title">💬 Sesiones</span>
+                <button id="btn-toggle-sessions" class="btn-icon" title="Colapsar">◀</button>
+            </div>
+            <button id="btn-new-session" class="btn-new-session">＋ Nueva sesión</button>
+            <div id="sessions-list" class="sessions-list">
+                <!-- Se llena dinámicamente -->
+            </div>
+            <div class="sessions-footer">
+                <button id="btn-lock-session" class="btn-icon" title="Privacidad de sesión">🔓</button>
+                <button id="btn-reset" class="btn-reset">Reiniciar</button>
+            </div>
+        </aside>
+        <button id="btn-reopen-sidebar" class="btn-icon btn-reopen-sidebar" title="Mostrar sesiones" style="display:none;">▶</button>
+        <!-- Panel de chat -->
+        <main class="chat-panel">
+            <header class="chat-header">
+                <h1><span class="header-sibelium">Sibelium</span></h1>
+            </header>
+            <div id="chat-messages" class="chat-messages">
+                <div id="connecting-message" class="connecting-message">
+                    <div class="connecting-spinner"></div>
+                    <p>Conectando con Sibelium...</p>
+                    <p class="connecting-subtitle">. . .El servidor está inicializando . . .</p>
+                </div>
+            </div>
+            <div class="chat-composer">
+                <input type="text" id="message-input" placeholder="Escribe tu mensaje..." maxlength="2000">
+                <button id="btn-file" class="btn-icon" title="Adjuntar archivo">📎</button>
+                <input type="file" id="file-input" accept=".txt,.md,.pdf,.json,.csv,.py,.js,.html,.css,.png,.jpg,.jpeg,.gif,.webp,.bmp,.mp3,.wav,.ogg,.m4a,.flac" style="display:none;">
+                <button id="btn-voice" class="btn-icon" title="Grabar mensaje de voz">🎤</button>
+                <button id="btn-send" class="btn-send">Enviar</button>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal para clave de sesión privada -->
+    <div id="lock-modal" class="modal" style="display:none;">
+        <div class="modal-content">
+            <h3>🔒 Proteger sesión</h3>
+            <p>Establece una clave para proteger esta sesión.</p>
+            <input type="password" id="lock-password" placeholder="Clave de acceso" maxlength="128">
+            <input type="password" id="lock-password-confirm" placeholder="Confirmar clave" maxlength="128">
+            <div id="lock-error" class="modal-error" style="display:none;"></div>
+            <div class="modal-buttons">
+                <button id="btn-lock-confirm" class="btn-send">🔒 Proteger</button>
+                <button id="btn-lock-remove" class="btn-reset" style="display:none;">🔓 Quitar</button>
+                <button id="btn-lock-cancel" class="btn-reset">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para desbloquear sesión -->
+    <div id="unlock-modal" class="modal" style="display:none;">
+        <div class="modal-content">
+            <h3>🔒 Sesión protegida</h3>
+            <p>Introduce la clave para acceder.</p>
+            <input type="password" id="unlock-password" placeholder="Clave de acceso" maxlength="128">
+            <div id="unlock-error" class="modal-error" style="display:none;"></div>
+            <div class="modal-buttons">
+                <button id="btn-unlock-confirm" class="btn-send">🔓 Desbloquear</button>
+                <button id="btn-unlock-cancel" class="btn-reset">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/api.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
