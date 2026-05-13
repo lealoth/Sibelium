@@ -86,7 +86,7 @@ cd sibelium
 pip install -r requirements.txt
 
 ### Download Models
-Place these models in the models/ directory:
+Place these models in the models/ (If you don't have it, create it) directory:
 
 It doesn't have to be only these; these are the ones that have given good results so far. (Low requirements)
 
@@ -122,6 +122,7 @@ Sibelium's intelligence is divided across multiple models:
 | **Llama 8B (local)** | Structured JSON extraction. | llama-cpp-python |
 | **Gemini Flash (cloud)** | Primary response generation. Premium quality. | OpenRouter |
 | **Llama 3.1 8B (cloud)** | Secondary cloud model. Free tier fallback. | OpenRouter |
+
 The LLMModel class automatically routes prompts to the right model based on purpose ("respuesta_final" → cloud, "reflexion_fondo" → local).
 
 ---
