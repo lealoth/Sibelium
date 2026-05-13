@@ -104,7 +104,31 @@ Sibelium Cognitive Architecture
 
 git clone https://github.com/yourusername/sibelium.git
 cd sibelium
+
+### Install Dependencies
+
 pip install -r requirements.txt
+
+# GPU Acceleration (Recommended)
+For GPU-accelerated inference (10-50x faster):
+
+# NVIDIA GPU:
+
+pip uninstall llama-cpp-python -y
+pip install llama-cpp-python --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu121
+
+# AMD / Intel GPU (Vulkan):
+
+**Windows PowerShell**:
+$env:CMAKE_ARGS="-DGGML_VULKAN=on"
+pip install llama-cpp-python --force-reinstall --no-cache-dir
+
+**Linux/Mac**:
+export CMAKE_ARGS="-DGGML_VULKAN=on"
+pip install llama-cpp-python --force-reinstall --no-cache-dir
+CPU-only (slow, fallback):
+
+pip install llama-cpp-python
 
 ### Download Models
 Place these models in the models/ (If you don't have it, create it) directory:
