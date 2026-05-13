@@ -23,7 +23,7 @@ GPU_BACKEND = "vulkan"
 LLM_BACKEND = "hybrid"
 
 # Cloud API (compatible con OpenAI)
-CLOUD_API_KEY = "---key---"  # Tu API key de modelo en la nube principal (asegúrate de mantenerla segura y no exponerla públicamente)
+CLOUD_API_KEY = "your-api-key-here"  # Tu API key de modelo en la nube principal (asegúrate de mantenerla segura y no exponerla públicamente)
 CLOUD_MODEL_PREMIUM = "google/gemini-2.0-flash-001" # Modelo premium en la nube para tareas complejas o cuando el local no es suficiente, se recomienda usar un modelo con buena capacidad de razonamiento y comprensión contextual para complementar al local
 CLOUD_MODEL_FREE = "meta-llama/llama-3.1-8b-instruct" # Modelo gratuito en la nube para tareas simples o como respaldo cuando el premium no está disponible
 CLOUD_API_URL = "https://openrouter.ai/api/v1"  # o "https://api.openai.com", etc.
@@ -52,7 +52,7 @@ RESPONSE_TEMPERATURE = 0.7
 MAX_VERIFICATION_RETRIES = 1
 
 # Archivos de datos
-ENTITY_DATA_DIR = BASE_DIR / "entity_data_nexus"
+ENTITY_DATA_DIR = BASE_DIR / "entitys" / "entity_data_nexus"
 PERSONA_FILE = ENTITY_DATA_DIR / "identity" / "persona.json"
 USERS_DIR = ENTITY_DATA_DIR / "memory" / "users"
 SELF_STATE_FILE = ENTITY_DATA_DIR / "memory" / "self_state.json"
