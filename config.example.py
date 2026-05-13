@@ -52,7 +52,7 @@ RESPONSE_TEMPERATURE = 0.7
 MAX_VERIFICATION_RETRIES = 1
 
 # Archivos de datos
-ENTITY_DATA_DIR = BASE_DIR / "entitys" / "entity_data_nexus"
+ENTITY_DATA_DIR = BASE_DIR / "entitys" / "entity_data_default"
 PERSONA_FILE = ENTITY_DATA_DIR / "identity" / "persona.json"
 USERS_DIR = ENTITY_DATA_DIR / "memory" / "users"
 SELF_STATE_FILE = ENTITY_DATA_DIR / "memory" / "self_state.json"
