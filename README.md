@@ -20,6 +20,14 @@ Nexus is the first "citizen" of Sibelium. She is an evolving artificial entity w
 
 Nexus is not a product. She is a demonstration and a companion in the exploration of what artificial minds can become.
 
+If you want to know it, clone the directory.
+
+You are totally free to review every log and chat history between her and her creator. (Everything is in Spanish)
+
+Find it inside the Templates folder as "entity_data_nexus". Drag the folder into the base directory and change ENTITY_DATA_DIR = BASE_DIR / "entity_data_nexus" inside config.py
+
+Or create your own Entity, you can use Nexus or the Template next to it as templates.
+
 ---
 
 ## Architecture Overview
@@ -99,9 +107,18 @@ Edit config.py to set:
 
 - LLM_BACKEND: "local", "cloud", or "hybrid"
 
-- CLOUD_API_KEY: Your OpenRouter API key (for cloud models)
+- CLOUD_API_KEY: Your OpenRouter API key (for cloud models)  High-capacity, good-quality models that are not easily saturated with a large amount of context are recommended.
 
 - GPU_BACKEND: "vulkan" or "cuda"
+
+- IDIOMA = "español" o "English/Inglés"
+
+Make sure you have the models in the models/ folder in the base directory, and reference them in config.py.
+
+MODEL_PATH = BASE_DIR / "models" / "Llama-3.1-8B-Instruct-Q4_K_M.gguf"    # Main Model
+MODEL_PATH_REASONING = BASE_DIR / "models" / "palmyra-mini-thinking-a.BF16.gguf"  # Reasoning Model
+MODEL_PATH_JSON = BASE_DIR / "models" / "palmyra-mini-thinking-a.BF16.gguf" # It is currently unused, but it exists. The json filling functions are delegated to the main model for now.
+
 
 ### Run
 py main.py
