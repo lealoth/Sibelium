@@ -20,7 +20,7 @@ Nexus is the first "citizen" of Sibelium. She is an evolving artificial entity w
 
 Nexus is not a product. She is a demonstration and a companion in the exploration of what artificial minds can become.
 
-If you want to know it, clone the directory.
+If you want to meet her, clone the directory.
 
 You are totally free to review every log and chat history between her and her creator. (Everything is in Spanish)
 
