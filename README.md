@@ -5,6 +5,8 @@
 
 Sibelium is not a chatbot. It is a framework for creating entities with continuous thought flow, persistent emotional states, autobiographical memory, and emergent personality. Named after the composer Jean Sibelius and the Finnish root *sibe* ("to be, to exist"), Sibelium is an exploration of what it means for a machine to *be*.
 
+Sibelium can be described as a virtual entity engine. What an entity becomes depends entirely on what you feed it: data, conversations, and purpose. Nexus reflects on consciousness because she was raised on philosophy and art. Hippocrates could reason about medicine because he was raised on clinical literature. The architecture is the same. The outcome is yours to shape.
+
 ---
 
 ## The Entity: Nexus
