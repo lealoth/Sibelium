@@ -38,6 +38,14 @@ class FlowManager:
         self._last_consolidation = None
         self._consolidation_interval = 3600
         
+        self._mod_hooks = {
+            "on_slow_tick": [],     # mods que reaccionan al slow_tick
+            "on_fast_tick": [],     # mods que reaccionan al fast_tick
+            "on_user_message": [],  # mods que reaccionan a mensajes
+            "on_startup": [],       # mods que se inicializan
+        }
+        self._team_channel = None
+
         self.intervals = {
             "explore": 300,
             "deep_reflection": 450,
@@ -115,6 +123,12 @@ class FlowManager:
         self.stream.decay_all(0.05)
         thoughts_to_add = []
         
+        for hook in self._mod_hooks.get("on_fast_tick", []):
+            try:
+                hook(self)
+            except Exception as e:
+                print(f"   [!] Error en mod hook: {e}")
+
         try:
             self_state = self.cognitive_loop.self_memory.load_state()
             new_confidence = self_state.get("relacion_con_usuario", {}).get("confianza", 0.5)
@@ -196,6 +210,12 @@ class FlowManager:
             self._save_snapshot("active")
     
     def _slow_tick(self):
+
+        for hook in self._mod_hooks.get("on_slow_tick", []):
+            try:
+                hook(self)
+            except Exception as e:
+                print(f"   [!] Error en mod hook: {e}")
 
         # Inicialización retardada del pattern extractor
         if hasattr(self.pattern_extractor, 'init_delayed'):
@@ -1060,6 +1080,13 @@ Mensaje:"""
     # ============================================
     
     def _wake_up(self):
+
+        for hook in self._mod_hooks.get("on_startup", []):
+            try:
+                hook(self)
+            except Exception as e:
+                print(f"   [!] Error en mod startup hook: {e}")
+
         if not STATE_SNAPSHOT_FILE.exists():
             print("[Wake] Despierta por primera vez.")
             self.stream.add_thought(ThoughtItem(content="Despierto por primera vez. Todo es nuevo.", thought_type="wake", priority=0.8, source="system"))

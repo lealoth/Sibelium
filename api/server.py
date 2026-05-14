@@ -33,6 +33,9 @@ import hashlib
 from config import ENTITY_DATA_DIR
 from core.cognitive_loop import CognitiveLoop
 
+from mods.loader import loader
+from config import ENABLED_MODS
+
 # ============================================
 # CONFIGURACIÓN INICIAL
 # ============================================
@@ -111,6 +114,7 @@ def get_or_create_loop(session_id: str) -> CognitiveLoop:
             }, ensure_ascii=False, indent=2), encoding="utf-8")
         
         loop = CognitiveLoop(user_id=session_id, start_flow=False)
+        loader.setup_all(ENABLED_MODS, loop.flow_manager)
         loop.flow_manager.start()
         sessions[session_id] = loop
         print(f"[Session] Sesión cargada: {session_id}")

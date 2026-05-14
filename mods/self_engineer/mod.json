@@ -1,0 +1,13 @@
+{
+  "name": "Self Engineer",
+  "version": "1.0.0",
+  "description": "Allows an entity to read, analyze, and propose improvements to its own source code. Includes sandboxed code execution for testing solutions.",
+  "author": "Sibelium",
+  "dependencies": [],
+  "permissions": ["read_code", "execute_code"],
+  "config": {
+    "analysis_interval_hours": 24,
+    "max_file_size_chars": 6000,
+    "execution_timeout_seconds": 10
+  }
+}
