@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any
 from pathlib import Path
 
-from config import BASE_DIR, SCAFFOLDING_FILE, DETECTORS_LOG_FILE
+from config import DETECTORS_LOG_FILE
 
 class PatternValidator:
     """Evalúa si un patrón extraído es seguro y útil."""

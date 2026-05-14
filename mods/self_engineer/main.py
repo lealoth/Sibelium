@@ -29,7 +29,7 @@ def setup(flow_manager):
         interval_seconds = 0
     else:
         interval_seconds = int(interval_hours * 3600)
-    
+
     def on_startup(fm):
         engineer.reader.index_codebase()
         print("   [SelfEngineer] Codebase indexed.")
@@ -77,6 +77,7 @@ def setup(flow_manager):
     
     flow_manager._mod_hooks["on_startup"].append(on_startup)
     flow_manager._mod_hooks["on_slow_tick"].append(on_slow_tick)
+    flow_manager._mod_hooks["on_fetch_info"].append(on_fetch_info)
     
     print("   [SelfEngineer] Ready.")
     return {"engineer": engineer, "executor": executor}
@@ -87,3 +88,21 @@ def teardown(flow_manager):
     flow_manager.self_engineer = None
     flow_manager.code_executor = None
     print("   [SelfEngineer] Disabled.")
+
+def on_fetch_info(needed, user_msg, fm):
+    """Inyecta información del codebase cuando es relevante."""
+    if not hasattr(fm, 'code_reader') or not fm.code_reader:
+        return None
+    
+    needed_upper = needed.upper()
+    if "MEMORY" not in needed_upper and "ACTIVITY" not in needed_upper:
+        return None
+    
+    # Indexar si no está indexado
+    if not fm.code_reader.index:
+        fm.code_reader.index_codebase()
+    
+    results = fm.code_reader.search_codebase(user_msg)
+    if results:
+        return f"CÓDIGO RELEVANTE:\n{results}"
+    return None
