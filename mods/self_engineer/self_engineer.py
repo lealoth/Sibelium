@@ -140,7 +140,7 @@ PROBLEMA: [breve]
 FUNCIÓN: [nombre exacto]
 SEVERIDAD: [baja/media/alta]
 EXPLICACIÓN: [por qué es un problema]
-SOLUCIÓN: [código o pseudocódigo]
+SOLUCIÓN: [código Python ejecutable que resuelva el problema. Debe ser el MÍNIMO cambio necesario. Solo incluye la función o líneas modificadas, no el archivo completo. Si la solución no requiere código, escribe SIN_CODIGO.]
 TRADE-OFF: [qué se pierde al aplicar el cambio]
 ---"""
         

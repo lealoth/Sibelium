@@ -8,6 +8,8 @@
   "config": {
     "analysis_interval_hours": 0.5,
     "max_file_size_chars": 6000,
-    "execution_timeout_seconds": 10
+    "execution_timeout_seconds": 10,
+    "self_review_enabled": true,
+    "test_solutions_enabled": true
   }
 }

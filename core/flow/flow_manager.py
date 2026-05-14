@@ -781,7 +781,9 @@ Responde SOLO con las etiquetas necesarias: USER, MEMORY, o NONE."""
         
         file_to_analyze = random.choice(unanalyzed)
         from core.perception.file_analyzer import FileAnalyzer
-        result = FileAnalyzer.get_instance().analyze(str(file_to_analyze), llm=self.llm)
+        result = FileAnalyzer.get_instance().analyze_with_granularity(
+            str(file_to_analyze), level="detallado", llm=self.llm
+        )
         
         # Usar ruta relativa para el log
         rel_path = str(file_to_analyze.relative_to(EXPLORE_DIR))

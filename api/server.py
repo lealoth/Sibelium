@@ -379,7 +379,7 @@ async def upload_file(file: UploadFile = File(...), session_id: str = "default")
     analyzer = FileAnalyzer.get_instance()
     loop = get_or_create_loop(session_id)
     llm = loop.flow_manager.llm if hasattr(loop, 'flow_manager') else None
-    result = analyzer.analyze(str(file_path), llm=llm)
+    result = analyzer.analyze_with_granularity(str(file_path), level="detallado", llm=llm)
     
     print(f"[Upload] ✅ Analizado: {result.get('type', 'unknown')}")
     
