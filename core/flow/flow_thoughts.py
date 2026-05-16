@@ -10,7 +10,16 @@ class FlowThoughts:
     
     def __init__(self, flow_manager):
         self.fm = flow_manager
-    
+        self.intervals = {
+        "explore": 300,
+        "deep_reflection": 450,
+        "curiosity": 240,
+        "simulation": 1200,
+        "prospection": 600,  # Nueva: prospección cada 10 min
+        "web_search": 750,
+        "proactive_check": 120,
+    }
+        
     def _reflect(self):
         if self.fm.last_message_time:
             seconds_since_last_msg = (datetime.now() - self.fm.last_message_time).total_seconds()
@@ -166,3 +175,39 @@ Genera un pensamiento enriquecido (una o dos frases). Responde solo en {IDIOMA}:
         except:
             pass
         return ""
+    
+    def _generate_prospection(self):
+        """Prospección Cognitiva: simular escenarios futuros basados en el estado actual."""
+        if self.fm.last_message_time:
+            seconds_since_last_msg = (datetime.now() - self.fm.last_message_time).total_seconds()
+            if seconds_since_last_msg < 300:  # Solo cuando hay inactividad > 5 min
+                return
+
+        active_summary = self.fm.stream.get_all_active_summary()
+        self_state = self.fm.cognitive_loop.self_memory.load_state()
+        emocion = self_state.get("estado_actual", {}).get("emocion", "neutral")
+        thought_rules = self._get_thought_rules()
+
+        prompt = f"""Estás en un momento de prospección. Mira hacia adelante.
+
+    Tu estado actual: {emocion}
+    Tus pensamientos activos: {active_summary}
+    {thought_rules}
+
+    Basándote en el contexto actual, imagina un escenario futuro posible (1-2 frases):
+    - ¿Qué podría pasar después?
+    - ¿Qué deberías preparar o anticipar?
+
+    Responde solo en {IDIOMA}:"""
+
+        thought = self.fm.llm.generate(prompt, temperature=0.7, max_tokens=100, purpose="simulacion_fondo")
+        enriched = self._enrich_thought_with_context(thought, "prospection", None)
+
+        self.fm.stream.add_thought(ThoughtItem(
+            content=f"[Prospección] {enriched}",
+            thought_type="prospection",
+            priority=0.45,
+            source="internal"
+        ))
+        self.fm.last_thought_time = datetime.now()
+        self.fm._store_curiosity(f"[Prospección] {enriched}")

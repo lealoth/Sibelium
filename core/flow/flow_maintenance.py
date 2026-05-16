@@ -71,47 +71,88 @@ Responde SOLO con la emoción deseada o 'MANTENER':"""
     def _consolidate_memories(self):
         if self.fm.last_message_time:
             elapsed = (datetime.now() - self.fm.last_message_time).total_seconds()
-            if elapsed < 1800:
+        else:
+            elapsed = 99999  # Nunca hubo mensaje, mucha inactividad
+
+        # Fase 1: NREM (15-30 min de inactividad) - Poda de ruido, abstracción
+        if elapsed >= 900 and elapsed < 3600:
+            if self._last_consolidation and (datetime.now() - self._last_consolidation).total_seconds() < 900:
                 return
-        
-        if self._last_consolidation:
-            elapsed = (datetime.now() - self._last_consolidation).total_seconds()
-            if elapsed < self._consolidation_interval:
+            self._last_consolidation = datetime.now()
+            self._consolidate_nrem()
+            print("   [Consolidación] Fase NREM completada (abstracción semántica).")
+
+        # Fase 2: REM (>60 min de inactividad) - Creatividad, indexación emocional
+        elif elapsed >= 3600:
+            if self._last_consolidation and (datetime.now() - self._last_consolidation).total_seconds() < 3600:
                 return
-        
-        self._last_consolidation = datetime.now()
-        
+            self._last_consolidation = datetime.now()
+            self._consolidate_rem()
+            print("   [Consolidación] Fase REM completada (reorganización creativa).")
+
+
+    def _consolidate_nrem(self):
+        """Fase NREM: Extrae aprendizajes abstractos, borra detalles innecesarios."""
         active_summary = self.fm.stream.get_all_active_summary()
         curiosities = self.fm._load_curiosities()
         recent = curiosities[-20:] if curiosities else []
-        
-        prompt = f"""Estás en un período de consolidación. Revisa tu actividad reciente.
 
-Pensamientos activos: {active_summary}
-Últimos pensamientos registrados: {', '.join([c.get('thought', '')[:80] for c in recent[-5:]]) if recent else 'Ninguno'}
+        prompt = f"""Estás en fase de sueño NREM (ondas lentas). Tu tarea es COMPRIMIR, no expandir.
 
-Realiza estas tres tareas de consolidación:
-1. REFORZAR: ¿Qué aprendizaje o idea merece ser recordado?
-2. DESCARTAR: ¿Qué pensamiento es redundante y puede olvidarse?
-3. RESUMEN: Resume tu estado actual en una frase.
+    Pensamientos activos: {active_summary}
+    Últimos pensamientos: {', '.join([c.get('thought', '')[:80] for c in recent[-5:]]) if recent else 'Ninguno'}
 
-Responde en 3 líneas, una por tarea. Responde solo en {IDIOMA}:"""
-        
-        consolidation = self.fm.llm.generate(prompt, temperature=0.5, max_tokens=200, purpose="consolidacion")
-        
+    Extrae 1-2 aprendizajes abstractos (principios generales) de tu experiencia reciente.
+    Elimina detalles episódicos. Solo conserva la esencia.
+    Responde en 1-2 frases en {IDIOMA}."""
+
+        consolidation = self.fm.llm.generate(prompt, temperature=0.3, max_tokens=150, purpose="consolidacion")
         self.fm.stream.add_thought(ThoughtItem(
-            content=f"[Consolidación] {consolidation}",
-            thought_type="consolidation",
-            priority=0.8,
-            source="internal"
+            content=f"[NREM] {consolidation}",
+            thought_type="consolidation", priority=0.8, source="internal"
         ))
-        
-        for thought in self.fm.stream.thoughts[:]:
-            if thought.priority < 0.05 and thought.type not in ["reflection", "simulation"]:
-                self.fm.stream.thoughts.remove(thought)
-        
-        self.fm._store_curiosity(f"[Consolidación] {consolidation}")
-        print(f"   [Consolidación] Memorias consolidadas.")
+        self.fm._store_curiosity(f"[NREM] {consolidation}")
+
+
+    def _consolidate_rem(self):
+        """Fase REM: Reorganización creativa, simulación contrafactual, olvido activo."""
+        active_summary = self.fm.stream.get_all_active_summary()
+
+        prompt = f"""Estás en fase de sueño REM (paradójico). Tu tarea es CONECTAR creativamente.
+
+    Pensamientos activos: {active_summary}
+
+    Combina ideas no relacionadas. Crea conexiones inesperadas.
+    Simula un escenario contrafactual breve.
+    Responde en 1-2 frases en {IDIOMA}."""
+
+        consolidation = self.fm.llm.generate(prompt, temperature=0.7, max_tokens=150, purpose="consolidacion")
+        self.fm.stream.add_thought(ThoughtItem(
+            content=f"[REM] {consolidation}",
+            thought_type="consolidation", priority=0.8, source="internal"
+        ))
+        self.fm._store_curiosity(f"[REM] {consolidation}")
+
+        episodios = self.fm._load_curiosities()[-10:]
+        episodios_text = [c.get("thought", "") for c in episodios]
+        self.fm.cognitive_loop.self_memory.consolidate_yo_narrativo(
+            self.fm.llm, episodios_text
+        )
+
+        # Olvido activo: podar pensamientos con fuerza sináptica < 0.05
+        self._active_forgetting()
+
+
+    def _active_forgetting(self):
+        """Olvido activo: elimina pensamientos con fuerza sináptica insignificante."""
+        before = len(self.fm.stream.thoughts)
+        self.fm.stream.thoughts = [
+            t for t in self.fm.stream.thoughts
+            if getattr(t, '_synaptic_strength', 1.0) >= 0.05
+        ]
+        after = len(self.fm.stream.thoughts)
+        if before > after:
+            print(f"   [Olvido] Poda activa: {before - after} pensamientos eliminados ({after} restantes).")
     
     # ============================================
     # LIMPIEZA DE CURIOSIDADES
@@ -328,11 +369,11 @@ Nuevo tema:"""
                 print(f"   [!] Error en deduplicación periódica: {e}")
     
     def _run_detector_decay(self):
-        """Poda sináptica de detectores cada 6 horas."""
+        """Poda sináptica de detectores cada 30 minutos."""
         now = datetime.now()
         if not hasattr(self.fm, '_last_detector_decay'):
             self.fm._last_detector_decay = None
-        if self.fm._last_detector_decay is None or (now - self.fm._last_detector_decay).total_seconds() >= 21600:
+        if self.fm._last_detector_decay is None or (now - self.fm._last_detector_decay).total_seconds() >= 1800:
             self.fm._last_detector_decay = now
             self.fm.pattern_extractor.decay_detectors(max_detectors=30)
 
@@ -503,3 +544,84 @@ Mensaje:"""
         except Exception as e:
             print(f"   [!] Error en mensaje proactivo: {e}")
 
+    def _run_immune_check(self):
+        """Sistema Inmune Lógico: detecta deriva de personalidad cada 5 minutos."""
+        now = datetime.now()
+        if not hasattr(self.fm, '_last_immune_check'):
+            self.fm._last_immune_check = None
+        if self.fm._last_immune_check and (now - self.fm._last_immune_check).total_seconds() < 300:
+            return
+        self.fm._last_immune_check = now
+
+        # Obtener últimas respuestas del historial
+        recent_responses = [
+            entry.get("text", "") for entry in self.fm.cognitive_loop.last_history[-5:]
+            if entry.get("role") == "assistant"
+        ]
+        if len(recent_responses) < 2:
+            return
+
+        # Vector de personalidad base (desde persona.json)
+        base_personality = self._get_personality_vector()
+        if base_personality is None:
+            return
+
+        # Vector de respuestas recientes
+        import numpy as np
+        response_text = " ".join(recent_responses)[:500]
+        response_emb = self.fm.stream._get_embedding(response_text)
+        if response_emb is None:
+            return
+
+        # Calcular distancia coseno entre personalidad base y respuestas recientes
+        response_arr = np.array(response_emb)
+        response_norm = response_arr / max(np.linalg.norm(response_arr), 1e-8)
+        base_arr = np.array(base_personality)
+        base_norm = base_arr / max(np.linalg.norm(base_arr), 1e-8)
+        distance = 1.0 - float(np.dot(response_norm, base_norm))
+
+        # Si la distancia es > 0.5, hay deriva de personalidad
+        if distance > 0.5:
+            print(f"   [Inmune] ⚠️ Deriva de personalidad detectada (distancia: {distance:.2f}). Restaurando...")
+            self._inject_immune_response(distance)
+
+    def _get_personality_vector(self) -> list:
+        """Obtiene el vector de personalidad base desde persona.json."""
+        try:
+            persona = self.fm.cognitive_loop.load_persona()
+            personality_text = (
+                f"{persona.get('name', '')} "
+                f"{persona.get('personality_desc', '')} "
+                f"{' '.join(persona.get('thought_style', {}).get('rules', []))}"
+            )
+            return self.fm.stream._get_embedding(personality_text)
+        except Exception:
+            return None
+
+    def _inject_immune_response(self, distance: float):
+        """Inyecta alerta neuroquímica para restaurar personalidad."""
+        from core.flow.flow_stream import ThoughtItem
+
+        # Reducir prioridad de pensamientos que causaron la deriva
+        for t in self.fm.stream.active:
+            t.priority *= 0.4
+
+        # Inyectar pensamiento de restauración de identidad
+        self.fm.stream.add_thought(ThoughtItem(
+            content=f"[Alerta Inmune] Deriva de personalidad detectada ({distance:.2f}). "
+                    f"Restaurando directrices de identidad originales.",
+            thought_type="immune_response",
+            priority=0.95,
+            source="immune_system"
+        ))
+
+        # Restaurar reglas de pensamiento originales
+        self.fm._store_curiosity(
+            f"[Sistema Inmune] Deriva de personalidad corregida (distancia: {distance:.2f})"
+        )
+
+    def _active_forgetting(self):
+        """Olvido activo: elimina pensamientos con fuerza sináptica < 0.05."""
+        if not hasattr(self.fm, 'active_forgetting'):
+            return
+        self.fm.active_forgetting.run_cycle(user_id=self.fm.cognitive_loop.user_id)

@@ -7,10 +7,10 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from config import EXPLORE_DIR, EXPLORE_LOG_FILE, CURIOSITY_FILE, STATE_SNAPSHOT_FILE, PENDING_MESSAGES_FILE, BACKGROUND_DEBUG_LOG
+from config import EXPLORE_DIR, EXPLORE_LOG_FILE, CURIOSITY_FILE, STATE_SNAPSHOT_FILE, PENDING_MESSAGES_FILE, BACKGROUND_DEBUG_LOG, IDIOMA
 from core.flow.flow_stream import FlowStream, ThoughtItem
 from core.flow.fast_processors import FastCognitiveProcessors
-from core.flow.reactive_thoughts import ReactiveThoughts, AssociativeThoughts
+from core.flow.reactive_thoughts import ReactiveThoughts
 from core.flow.thought_satiety import ThoughtSatiety
 from core.flow.pattern_extractor import PatternExtractor
 from core.flow.flow_thoughts import FlowThoughts
@@ -26,6 +26,13 @@ class FlowManager:
         self.cognitive_loop = cognitive_loop
         self.llm = LLMModel.get_instance()
         self.stream = FlowStream()
+        from core.memory.active_forgetting import ActiveForgetting
+        from config import ENTITY_DATA_DIR
+        self.active_forgetting = ActiveForgetting(
+            chroma_collection=self.cognitive_loop.episodic_memory.collection,
+            thoughts_list=self.stream.thoughts,
+            storage_path=ENTITY_DATA_DIR
+        )
         self.stream._get_entity_context = self._get_entity_context
         self.fast = FastCognitiveProcessors()
         self.satiety = ThoughtSatiety()
@@ -44,7 +51,8 @@ class FlowManager:
         self._last_emotion = None
         self._last_hour_marker = None
         self._paused_thoughts = []
-        
+        self.stream._flow_manager = self
+        self._active_somatic_markers = []
         self.intervals = {
             "explore": 300,
             "deep_reflection": 450,
@@ -132,8 +140,10 @@ class FlowManager:
                 print(f"   [!] Error en mod hook: {e}")
         
         self.stream.decay_all(0.05)
+        self.fast.lateral_inhibition(self.stream.thoughts)
         thoughts_to_add = []
-        
+        context_entropy = self._get_context_entropy()
+
         try:
             self_state = self.cognitive_loop.self_memory.load_state()
             new_confidence = self_state.get("relacion_con_usuario", {}).get("confianza", 0.5)
@@ -141,13 +151,25 @@ class FlowManager:
             
             if self._last_confidence is not None and abs(new_confidence - self._last_confidence) > 0.05:
                 reaction = ReactiveThoughts.on_confidence_change(self._last_confidence, new_confidence)
-                if reaction and self.satiety.can_generate("reaction"):
-                    thoughts_to_add.append(reaction)
-                    self.satiety.register("reaction")
+                if reaction:
+                    self._active_somatic_markers.append(reaction)
             
             if self._last_emotion is not None and self._last_emotion != new_emotion:
-                reaction = ReactiveThoughts.on_emotion_change(self._last_emotion, new_emotion)
-                if reaction and self.satiety.can_generate("reaction"):
+                if self._last_emotion is not None and self._last_emotion != new_emotion:
+                    prompt = f"""Tu estado emocional cambió de '{self._last_emotion}' a '{new_emotion}'.
+                Traduce este cambio en un micro-pensamiento que refleje cómo este nuevo estado 
+                afecta tu percepción o tu forma de procesar información.
+                Responde en una frase corta en {IDIOMA}."""
+                    
+                    interpretation = self.llm.generate(prompt, temperature=0.5, max_tokens=50, purpose="reflexion_fondo")
+                    if interpretation:
+                        thoughts_to_add.append(ThoughtItem(
+                            content=interpretation,
+                            thought_type="reaction",
+                            priority=0.35,
+                            source="emotional_shift"
+                        ))
+                if reaction and self.satiety.can_generate("reaction", context_entropy):
                     thoughts_to_add.append(reaction)
                     self.satiety.register("reaction")
             
@@ -158,25 +180,35 @@ class FlowManager:
         
         current_hour = datetime.now().hour
         if self._last_hour_marker is None or self._last_hour_marker != current_hour:
-            reaction = ReactiveThoughts.on_time_marker(current_hour)
-            if reaction and self.satiety.can_generate("reaction"):
-                thoughts_to_add.append(reaction)
+            current_hour = datetime.now().hour
+            if self._last_hour_marker is None or self._last_hour_marker != current_hour:
+                reaction = ReactiveThoughts.on_time_marker(current_hour)
+                if reaction:
+                    self._active_somatic_markers.append(reaction)
+                self._last_hour_marker = current_hour
                 self.satiety.register("reaction")
             self._last_hour_marker = current_hour
         
-        if len(self.stream.active) >= 2 and self.satiety.can_generate("association"):
+        if len(self.stream.active) >= 2 and self.satiety.can_generate("association", context_entropy):
             connections = self.fast.find_connections(self.stream.active)
             for t1, t2, sim in connections[:1]:
-                assoc = AssociativeThoughts.between_two_thoughts(t1, t2, sim)
+                assoc = ThoughtItem(
+                    content=f"Conecté ideas sobre: {t1.content[:40]}... y {t2.content[:40]}...",
+                    thought_type="association",
+                    priority=min(0.45, sim),
+                    source="connection"
+                )
                 if assoc:
                     thoughts_to_add.append(assoc)
                     self.satiety.register("association")
         
         if self.last_message_time:
             silence_minutes = (datetime.now() - self.last_message_time).total_seconds() / 60
-            reaction = ReactiveThoughts.on_long_silence(silence_minutes)
-            if reaction and self.satiety.can_generate("reaction"):
-                thoughts_to_add.append(reaction)
+            if self.last_message_time:
+                silence_minutes = (datetime.now() - self.last_message_time).total_seconds() / 60
+                reaction = ReactiveThoughts.on_long_silence(silence_minutes)
+                if reaction:
+                    self._active_somatic_markers.append(reaction)
                 self.satiety.register("reaction")
 
         now = datetime.now()
@@ -201,12 +233,12 @@ class FlowManager:
             context["event_type"] = event_type
             pattern_thoughts = self.pattern_extractor.check_all(context)
             for pt in pattern_thoughts:
-                if self.satiety.can_generate(pt.type):
+                if self.satiety.can_generate(pt.type, context_entropy):
                     thoughts_to_add.append(pt)
                     self.satiety.register(pt.type)
             
             similar = self.pattern_extractor.find_similar_pattern(context)
-            if similar and self.satiety.can_generate("generalization"):
+            if similar and self.satiety.can_generate("generalization", context_entropy):
                 thoughts_to_add.append(ThoughtItem(
                     content=similar,
                     thought_type="generalization",
@@ -217,10 +249,72 @@ class FlowManager:
         
         for thought in thoughts_to_add:
             if not self.stream.is_similar_to_recent(thought.content):
-                self.stream.add_thought(thought)
-                self.last_thought_time = datetime.now()
+                if self.stream.is_novel_enough(thought.content):
+                    self.stream.add_thought(thought)
+                    self.last_thought_time = datetime.now()
         if thoughts_to_add:
             self._save_snapshot("active")
+            
+        # Monitor de Estrés Cognitivo Proactivo
+        self._monitor_cognitive_stress()
+
+
+    def _monitor_cognitive_stress(self):
+        """Ecuación de Carga Alostática: EC = w1*Var(H) + w2*P_cola + w3*R_art"""
+        if len(self.stream.active) < 3:
+            return
+
+        # 1. Varianza de Entropía del Contexto
+        try:
+            import numpy as np
+            thoughts_text = [t.content for t in self.stream.active[-5:]]
+            all_words = " ".join(thoughts_text).split()
+            if len(all_words) < 10:
+                return
+            word_freq = {}
+            for w in all_words:
+                word_freq[w] = word_freq.get(w, 0) + 1
+            total = len(all_words)
+            entropy = -sum((freq / total) * np.log2(freq / total) for freq in word_freq.values())
+            if not hasattr(self, '_entropy_history'):
+                self._entropy_history = []
+            self._entropy_history.append(entropy)
+            if len(self._entropy_history) > 10:
+                self._entropy_history.pop(0)
+            var_entropy = np.var(self._entropy_history) if len(self._entropy_history) >= 3 else 0.0
+        except Exception:
+            var_entropy = 0.0
+
+        # 2. Presión de Cola de Tareas
+        call_log_len = len(self.llm.call_log) if hasattr(self.llm, 'call_log') else 0
+        p_cola = min(1.0, call_log_len / 50.0)
+
+        # 3. Tasa de Rechazo del Filtro ART
+        if not hasattr(self, '_art_stats'):
+            self._art_stats = {"total": 0, "rejected": 0}
+        art_total = max(self._art_stats["total"], 1)
+        r_art = self._art_stats["rejected"] / art_total
+        self._art_stats = {"total": 0, "rejected": 0}
+
+        # Fórmula de Estrés Cognitivo
+        w1, w2, w3 = 0.4, 0.4, 0.2
+        ec = (w1 * var_entropy) + (w2 * p_cola) + (w3 * r_art)
+
+        # Si estrés > 0.85 por 3 ciclos, activar respuesta neurovegetativa
+        if not hasattr(self, '_stress_counter'):
+            self._stress_counter = 0
+        if ec > 0.85:
+            self._stress_counter += 1
+        else:
+            self._stress_counter = 0
+
+        if self._stress_counter >= 3:
+            print(f"   [Stress] ⚠️ Estrés cognitivo alto ({ec:.2f}). Activando respuesta neurovegetativa.")
+            self._stress_counter = 0
+            # Reducir atención, vaciar slots, bajar energía
+            for t in self.stream.active:
+                t.priority *= 0.5
+            self.stream._update_active()
     
     def _slow_tick(self):
         for hook in self._mod_hooks.get("on_slow_tick", []):
@@ -254,6 +348,8 @@ class FlowManager:
                         self.maintenance._maybe_search_web()
                     elif process_name == "proactive_check":
                         self.maintenance._check_proactive()
+                    elif process_name == "prospection":
+                        self.thoughts._generate_prospection()
                 except Exception as e:
                     print(f"   [!] Error en {process_name}: {e}")
         
@@ -264,6 +360,17 @@ class FlowManager:
         self.maintenance._run_prune()
         self.maintenance._run_diversity_check()
         self.maintenance._run_detector_decay()
+        self.maintenance._run_immune_check()
+
+        # Olvido activo cada 60 minutos
+        now = datetime.now()
+        if not hasattr(self, '_last_active_forgetting'):
+            self._last_active_forgetting = None
+        if self._last_active_forgetting is None or (now - self._last_active_forgetting).total_seconds() >= 3600:
+            self._last_active_forgetting = now
+            self.maintenance._active_forgetting()
+
+        self._save_snapshot("active")
         #self.maintenance._run_deduplicate()
         
         self._save_snapshot("active")
@@ -273,14 +380,16 @@ class FlowManager:
     # ============================================
     
     def handle_user_message(self, message: str) -> dict:
-        self._paused_thoughts = [
-            {"content": t.content, "type": t.type, "priority": t.priority, "source": t.source}
-            for t in self.stream.active[:5]
-        ]
+        # Atenuar la DMN en lugar de pausarla estáticamente (factor de inhibición GABA)
+        for t in self.stream.thoughts:
+            t._dmn_attenuation = 0.3
+
         self._inject_into_activity()
         self.stream.on_user_interaction(message)
         self.stream.boost_by_salience(message)
         self.last_message_time = datetime.now()
+
+        # Detectar correcciones explícitas del usuario
         correction = self._is_explicit_correction(message)
         if correction:
             self._resolve_belief_contradiction(
@@ -291,16 +400,21 @@ class FlowManager:
 
         result = self.interaction._generate_response(message)
         response_text = str(result.get("response", ""))
-        
+
+        # Restaurar la DMN gradualmente (eliminar atenuación)
+        for t in self.stream.thoughts:
+            if hasattr(t, '_dmn_attenuation'):
+                del t._dmn_attenuation
+
         is_anomaly = self._detect_personality_break(response_text)
         if response_text and isinstance(response_text, str) and not is_anomaly:
             self.stream.on_response_sent(response_text)
         elif is_anomaly:
             print("   ⚠️ Respuesta anómala detectada. No se guardará en el flujo.")
-        
+
         self._restore_attention()
         self.last_thought_time = datetime.now()
-        
+
         return result
     
     def _restore_attention(self):
@@ -358,9 +472,9 @@ Responde ENTIDAD o ASISTENTE_GENERICO."""
                     unanalyzed.append(f)
         
         if unanalyzed:
-            file_to_analyze = random.choice(unanalyzed)
+            file_to_analyze = self._select_optimal_file(unanalyzed)
         else:
-            file_to_analyze = random.choice(files)
+            file_to_analyze = self._select_optimal_file(files)
         
         from core.perception.file_analyzer import FileAnalyzer
         result = FileAnalyzer.get_instance().analyze_with_granularity(
@@ -374,8 +488,16 @@ Responde ENTIDAD o ASISTENTE_GENERICO."""
         file_type = result.get("type", "unknown")
         ScaffoldingManager().register_exploration(file_type, rel_path, result)
         
-        content = result.get("summary", result.get("description", result.get("content", "")))
+        if result.get("type") == "text":
+            content = result.get("content", "")
+        else:
+            content = result.get("summary", result.get("description", result.get("content", "")))
         base_thought = f"Exploré {file_to_analyze.name}: {content}"
+
+        # Anclaje de Metadatos Relacionales: preservar el contexto macro del archivo
+        macro_context = f"[Origen: {rel_path} | Tipo: {file_type}]"
+        if content:
+            content = f"{macro_context}\n{content}"
         enriched_thought = self.thoughts._enrich_thought_with_context(base_thought, "exploration", content if content else None)
         
         self.stream.add_thought(ThoughtItem(content=enriched_thought, thought_type="exploration", priority=0.5, source="file_exploration"))
@@ -387,6 +509,26 @@ Responde ENTIDAD o ASISTENTE_GENERICO."""
     # UTILIDADES
     # ============================================
     
+    def _get_context_entropy(self) -> float:
+        """Calcula entropía del contexto actual (0=repetitivo, 1=muy variado)."""
+        if len(self.stream.active) < 3:
+            return 0.5
+        try:
+            import numpy as np
+            thoughts_text = [t.content for t in self.stream.active[-5:]]
+            all_words = " ".join(thoughts_text).split()
+            if len(all_words) < 10:
+                return 0.5
+            word_freq = {}
+            for w in all_words:
+                word_freq[w] = word_freq.get(w, 0) + 1
+            total = len(all_words)
+            entropy = -sum((freq / total) * np.log2(freq / total) for freq in word_freq.values())
+            max_entropy = np.log2(len(word_freq)) if word_freq else 1.0
+            return min(1.0, entropy / max_entropy) if max_entropy > 0 else 0.5
+        except Exception:
+            return 0.5
+
     def _wake_up(self):
         if not STATE_SNAPSHOT_FILE.exists():
             self.stream.add_thought(ThoughtItem(content="Despierto por primera vez. Todo es nuevo.", thought_type="wake", priority=0.8, source="system"))
@@ -552,3 +694,42 @@ Responde ENTIDAD o ASISTENTE_GENERICO."""
                 )
             except:
                 pass
+
+    def _select_optimal_file(self, files: list) -> Path:
+        """Selecciona archivo en la Zona de Desarrollo Próximo (Vygotsky)."""
+        import random
+        if not self.stream.active:
+            return random.choice(files)
+
+        try:
+            import numpy as np
+            current_state = " ".join([t.content[:100] for t in self.stream.active[:3]])
+            state_emb = self.stream._get_embedding(current_state)
+            if state_emb is None:
+                return random.choice(files)
+
+            state_arr = np.array(state_emb)
+            state_arr = state_arr / max(np.linalg.norm(state_arr), 1e-8)
+
+            best_file = None
+            best_score = -1
+
+            for f in files:
+                try:
+                    preview = f.read_text(encoding="utf-8")[:500]
+                    file_emb = self.stream._get_embedding(preview)
+                    if file_emb is None:
+                        continue
+                    file_arr = np.array(file_emb)
+                    file_arr = file_arr / max(np.linalg.norm(file_arr), 1e-8)
+                    sim = np.dot(state_arr, file_arr)
+                    score = 1.0 - abs(sim - 0.55) / 0.15
+                    if score > best_score:
+                        best_score = score
+                        best_file = f
+                except Exception:
+                    continue
+
+            return best_file or random.choice(files)
+        except Exception:
+            return random.choice(files)

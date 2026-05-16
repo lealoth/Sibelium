@@ -81,25 +81,6 @@ class CognitiveLoop:
         except Exception as e:
             print(f"⚠️ No se pudo guardar el historial: {e}")
 
-    def _save_history_to_disk(self):
-        try:
-            safe_state = {
-                "persona_name": self.last_state.get("persona", {}).get("name"),
-                "current_message": self.last_state.get("current_interaction", {}).get("message"),
-                "timestamp": self.last_state.get("current_interaction", {}).get("timestamp"),
-                "recent_summary": self.last_state.get("recent_summary", ""),
-                "time_context": self.last_state.get("time_context", ""),
-            } if self.last_state else None
-
-            self.history_path.write_text(json.dumps({
-                "history": self.last_history[-100:],
-                "thought_history": self.last_thoughts_history,
-                "cognitive_state": safe_state,
-                "interaction_count": self.interaction_count,
-            }, ensure_ascii=False, indent=2), encoding="utf-8")
-        except Exception as e:
-            print(f"⚠️ No se pudo guardar el historial: {e}")
-
     def _load_interaction_count(self):
         try:
             if self.interaction_count_path.exists():
@@ -156,7 +137,6 @@ class CognitiveLoop:
         now = datetime.now()
         self.interaction_count += 1
         self._save_interaction_count()
-        print("🟢 INICIO process")
 
         persona = self.load_persona()
         analysis = analyze_user_message(message)
@@ -174,14 +154,11 @@ class CognitiveLoop:
             recent_summary=recent_summary,
         )
 
-        print(f"🟢 cognitive_state construido | Contexto: {recent_summary[:80]}..." if recent_summary else "🟢 cognitive_state construido")
-
+        # Generar respuesta (Hilo Principal - CEN)
         result = self.flow_manager.handle_user_message(message)
         response = result.get("response", "") if result else ""
         if not response or not response.strip():
-            response = "Lo siento, me quedé sin palabras. ¿Puedes repetir eso de otra forma?"
-
-        print(f"🟢 Respuesta ({len(response)} chars): {response[:100]}...")
+            response = "Lo siento, me quedé sin palabras."
 
         self.last_thoughts_current = result.get("thought_history", []) if result else []
         if not self.last_thoughts_current:
@@ -195,14 +172,33 @@ class CognitiveLoop:
             "cognitive_state": self.last_state,
         }
 
+        # Post-procesamiento DIFERIDO (Hilo Secundario - Hipocampo)
+        # No bloquea la respuesta al usuario
         threading.Thread(
-            target=self._post_process,
+            target=self._deferred_post_process,
             args=(message, response, analysis, cognitive_state, now),
             daemon=True
         ).start()
-        print("🟢 Post-procesos en segundo plano | Respuesta ya entregada")
 
         return return_result
+
+
+    def _deferred_post_process(self, message: str, response: str, analysis: dict, cognitive_state, now):
+        """Consolidación diferida asíncrona (Hipocampo). No bloquea la respuesta."""
+        try:
+            # 1. Post-procesamiento original (percepción, estado, memoria)
+            self._post_process(message, response, analysis, cognitive_state, now)
+
+            # 2. Actualizar grafo (NetworkX PageRank)
+            # self.flow_manager.stream._auto_link_all()
+
+            # 3. Actualizar estrés cognitivo para el Mediador Talámico
+            if hasattr(self.flow_manager, '_get_context_entropy'):
+                entropy = self.flow_manager._get_context_entropy()
+                stress = 1.0 - entropy
+                self.flow_manager.llm.set_cognitive_stress(stress)
+        except Exception as e:
+            print(f"⚠️ Error en post-procesamiento diferido: {e}")
 
     def _get_recent_summary(self) -> str:
         recent = self.last_history[-6:]

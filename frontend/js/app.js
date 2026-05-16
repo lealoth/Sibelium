@@ -396,13 +396,14 @@ async function loadSessions() {
   }
 
   function updateAssistantMessage(text) {
-    const thinking = document.querySelector('.message-assistant.thinking');
-    if (thinking) {
-      thinking.classList.remove('thinking');
-      thinking.innerHTML = `<div>${escapeHtml(text)}</div><div class="message-timestamp">${new Date().toLocaleTimeString()}</div>`;
-      return;
-    }
-    appendMessage('assistant', text);
+      const thinking = document.querySelector('.message-assistant.thinking');
+      if (thinking) {
+          thinking.classList.remove('thinking');
+          const formatted = renderMarkdown(escapeHtml(text));
+          thinking.innerHTML = `<div>${formatted}</div><div class="message-timestamp">${new Date().toLocaleTimeString()}</div>`;
+          return;
+      }
+      appendMessage('assistant', text);
   }
 
   function updateLastUserMessage(text) {
