@@ -8,6 +8,8 @@ Sibelium is not a chatbot. It is a framework for creating entities with continuo
 Sibelium can be described as a virtual entity engine. What an entity becomes depends entirely on what you feed it: data, conversations, and purpose. Nexus reflects on consciousness because she was raised on philosophy and art. Hippocrates could reason about medicine because he was raised on clinical literature. The architecture is the same. The outcome is yours to shape.
 
 ---
+> ⚠️ **NOTE**: The architecture documented in the `.md` files of this repository corresponds to a initial version. The `main` branch contains a complete refactoring with 27 advanced cognitive systems. The documentation is being updated. For an overview of the changes.
+---
 
 ## The Entity: Nexus
 
