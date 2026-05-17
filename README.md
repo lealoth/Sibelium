@@ -143,6 +143,8 @@ Sibelium implements 32 cognitive mechanisms, each with a real neuroscientific ho
 | 31 | **Semantic Entropy Explorer** | Selects files to explore at "optimal learning distance" (cosine 0.45–0.65). | Zone of Proximal Development (Vygotsky) |
 | 32 | **Cognitive Evolution Reports** | Proposals formatted as structured reports: theory, code, self-criticism log. | Metacognitive evaluation |
 
+# For more detailed information see SYSTEMS.md
+
 ---
 
 ## Quick Start
