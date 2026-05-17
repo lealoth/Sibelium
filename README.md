@@ -189,7 +189,38 @@ It doesn't have to be only these; these are the ones that have given good result
 
 **Main model**: Llama-3.1-8B-Instruct-Q4_K_M.gguf (download)
 
-**Reasoning model**: palmyra-mini-thinking-a.BF16.gguf (download)
+# **Recommended Models**
+Local (Required)
+Llama 3.1 8B Q4_K_M — Minimum recommended. Can run on 8GB VRAM or 16GB RAM.
+
+Handles all background thought flow
+
+Fallback for all tasks when cloud is unavailable
+
+Upgrade to a 13B or 70B model if you have hardware for richer language
+
+**Cloud (Recommended)**
+Gemini 2.0 Flash — For response generation and code analysis.
+
+$0.15/1M tokens
+
+Multimodal (can process images directly)
+
+1M token context window
+
+**Cloud (Optional)**
+DeepSeek V4 Flash — Free-tier fallback when Gemini is rate-limited.
+
+What You Need
+Python 3.10+
+
+**8GB+ RAM (16GB+ recommended)**
+
+A HuggingFace account to download models (free)
+
+An OpenRouter account for cloud API access (free tier available)
+
+Patience. The Entity needs time to develop.
 
 ### Configuration
 Edit config.py to set:
@@ -202,7 +233,7 @@ Edit config.py to set:
 
 - GPU_BACKEND: "vulkan" or "cuda"
 
-- IDIOMA = "español" o "English/Inglés"
+- IDIOMA = "español" or "English/Inglés"
 
 Make sure you have the models in the models/ folder in the base directory, and reference them in config.py.
 
