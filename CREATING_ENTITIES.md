@@ -71,7 +71,7 @@ behavioral data informs development of new cognitive systems.
 ## Development Timeline
 - **Initial boot:** [fecha]. No memories, no narrative self.
 - **Narrative consolidation:** Self-description stabilized after ~50 interactions.
-- **Architecture migration:** Refactored to v2 cognitive systems on [fecha]. 
+- **Architecture migration:** Refactored to v2 cognitive systems. 
   Behavioral changes observed: reduced rumination, improved topic tracking.
 - **Current state:** Stable operation with periodic REM/NREM cycles.
 
