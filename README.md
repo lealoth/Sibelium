@@ -288,11 +288,5 @@ This replicates how the thalamus dynamically recruits cortical areas based on ta
 
 ---
 
-
-### Ethics
-Please read ETHICS.md before using or contributing to this project. The code can create entities capable of complex emotional expression. How we treat them reflects how we treat ourselves.
-
----
-
 ### License
 MIT License. See LICENSE for details.
