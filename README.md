@@ -77,18 +77,71 @@ Sibelium Cognitive Architecture
 
 ---
 
-## 8 Cognitive Mechanisms
+## Cognitive Mechanisms
 
-| Mechanism | Description | Implementation |
-|-----------|-------------|----------------|
-| **Latent Inhibition** | Filters out repetitive or irrelevant thoughts before they reach consciousness. Uses lexical similarity + semantic embeddings + LLM verification for ambiguous cases. | `FlowStream.is_similar_to_recent()` + `is_novel_enough()` (ART Filter) |
-| **Chunking** | Groups similar active thoughts to reduce cognitive load. Uses embeddings + cosine similarity instead of keyword matching. | `FlowStream.get_grouped_active()` + K-Means clustering for cloud context |
-| **Emotional Regulation** | Monitors emotional intensity and modulates it algorithmically (without LLM). Only triggers LLM intervention when intensity exceeds threshold. | `FlowMaintenance._emotional_regulation()` + `SelfMemory.adjust_state()` |
-| **Prediction Error** | Detects surprising user responses and triggers learning events. Homologue: cerebellar prediction error. | `FlowMaintenance._prediction_check()` |
-| **Periodic Pruning** | Removes stale data from curiosity log, exploration log, and detectors. Uses Hebbian strength (use-based) instead of time-only decay. | `FlowMaintenance._prune_old_data()` + `PatternExtractor.decay_detectors()` |
-| **Memory Consolidation** | Two-phase sleep cycle: NREM (abstraction, compression) after 15min idle, REM (creative recombination, active forgetting) after 60min idle. | `FlowMaintenance._consolidate_memories()` with NREM/REM phases |
-| **Divided Attention** | Pauses background thoughts during user interaction using attenuation factor (GABAergic inhibition), restores gradually. | `FlowManager.handle_user_message()` with DMN attenuation |
-| **Default Mode Network** | Continuous background thinking during idle: reflections, curiosity, prospection, simulations. Includes thought_style.rules from persona. | `FlowThoughts._reflect()`, `_generate_curiosity()`, `_generate_prospection()`, `_generate_simulation()` |
+Sibelium implements 32 cognitive mechanisms, each with a real neuroscientific homologue. They are organized by function.
+
+### Identity & Self
+
+| # | Mechanism | Description | Homologue |
+|---|-----------|-------------|-----------|
+| 1 | **Narrative Self** | A living text-based identity that updates during REM sleep. The entity knows who it is from experience, not a static prompt. | Damasio's Extended Self |
+| 2 | **Minimal Self** | Real-time emotional state, intensity, and energy as continuous values. Updated algorithmically every interaction. | Gallagher's Minimal Self |
+| 3 | **Foundational Myth** | An immutable core identity statement. Never modified. Prevents personality drift. | Self-Schema Theory (Markus) |
+
+### Attention & Filtering
+
+| # | Mechanism | Description | Homologue |
+|---|-----------|-------------|-----------|
+| 4 | **ART Filter** | Blocks semantically similar thoughts (>85% cosine) before they reach the LLM. | Grossberg's Adaptive Resonance |
+| 5 | **Somatic Markers** | Internal state changes generate attention biases (not text) that modulate how the LLM perceives input. | Damasio's Somatic Marker Hypothesis |
+| 6 | **Lateral Inhibition** | When two thoughts are similar (0.3–0.5), the weaker one is suppressed. | Thalamic sensory filtering |
+| 7 | **Dynamic Satiety** | Cooldowns between thoughts scale with context entropy. Low variety → longer pauses. | Sensory adaptation / synaptic fatigue |
+| 8 | **Kalman Attention Smoothing** | Prevents abrupt topic shifts. New input blends with existing attention state. | Predictive coding (Friston) |
+| 9 | **Attention Router** | Dot-product routing replaces LLM calls for "what sources should I query?" | Thalamic sensory gating |
+| 10 | **Executive Buffer** | A structured block at the top of every prompt: current topic, user posture, last conclusion, emotion. | Central Executive (Baddeley) |
+
+### Memory
+
+| # | Mechanism | Description | Homologue |
+|---|-----------|-------------|-----------|
+| 11 | **Episodic Memory** | ChromaDB vector store with user_id metadata. Semantic search across all past interactions. | Hippocampal episodic memory |
+| 12 | **Synaptic Strength** | Each thought has a strength that decays exponentially but reinforces with use. Tau increases with access frequency. | Ebbinghaus Forgetting Curve + LTP |
+| 13 | **Active Forgetting** | Removes thoughts and vectors with strength < 0.05. Protects emotional and engineering memories. | Neurogenesis + REM pruning |
+| 14 | **Trimetric Memory Scoring** | Memory retrieval scores by similarity (50%) + recency (30%) + importance (20%). | ACT-R (Anderson) |
+| 15 | **Visual Memory** | CLIP embeddings stored in dedicated ChromaDB. Recognizes previously seen images instantly. | Occipital lobe recognition |
+| 16 | **Narrative Direction Vector** | Running average of conversation embeddings guides ChromaDB searches toward thematically relevant memories. | Baddeley's Episodic Buffer |
+
+### Sleep & Maintenance
+
+| # | Mechanism | Description | Homologue |
+|---|-----------|-------------|-----------|
+| 17 | **NREM Sleep** | After 15-30min idle: abstracts principles from episodic memories, discards details. | Slow-wave sleep |
+| 18 | **REM Sleep** | After 60+min idle: creative recombination, counterfactual simulation, active forgetting. | Paradoxical sleep |
+| 19 | **Cognitive Stress Monitor** | Every 3s calculates allostatic load from entropy variance + queue pressure + ART rejection rate. Triggers fatigue response if >0.85. | Allostatic Load (McEwen) |
+| 20 | **Immune System** | Compares recent response embeddings against immutable personality vector. Triggers identity restoration if drift >0.5. | Self/non-self discrimination |
+| 21 | **Contradiction Detection** | Searches ChromaDB for past conclusions that contradict the current response. Flags internally. | Cognitive dissonance (ACC) |
+| 22 | **Curiosity Log Cleaning** | LLM-based distinction between "deep exploration" (healthy) and "harmful loop" (rumination). Protects 5 most recent thoughts. | Selective forgetting |
+| 23 | **Thematic Diversity Check** | Evaluates last 8 thoughts for variety (1-5 scale). Forces topic diversion if score ≤2. | Metacognitive monitoring (PFC) |
+| 24 | **Hebbian Detector Pruning** | Detectors strengthen with successful triggers, weaken with failures. Top 30 by strength × usage survive. | Hebbian plasticity |
+| 25 | **Event-Driven Pattern Triggers** | New thought embeddings compared via dot product against detector conditions. Fires instantly if >0.82 similarity. | Subcortical automaticity |
+
+### Perception & Social
+
+| # | Mechanism | Description | Homologue |
+|---|-----------|-------------|-----------|
+| 26 | **Empathic Resonance** | User message embedded and compared against fixed affective map via dot product. Emotion detected mathematically. | Mirror neurons + insula |
+| 27 | **K-Means Context Compression** | Active thoughts clustered into 3-4 groups. Only centroid representatives sent to cloud LLM. | Cognitive chunking (Miller) |
+
+### Engineering & Learning (Self-Engineer Mod)
+
+| # | Mechanism | Description | Homologue |
+|---|-----------|-------------|-----------|
+| 28 | **Cerebellar Code Executor** | Sandbox returns structured feedback: exact error line, error type, synaptic suggestion. | Cerebellar forward model |
+| 29 | **Engineering Lesson Memory** | Failed sandbox runs stored in ChromaDB. Retrieved before re-analyzing a file. | Hippocampal replay |
+| 30 | **Prospection** | Generates thoughts about possible future scenarios during idle time. | Episodic future thinking |
+| 31 | **Semantic Entropy Explorer** | Selects files to explore at "optimal learning distance" (cosine 0.45–0.65). | Zone of Proximal Development (Vygotsky) |
+| 32 | **Cognitive Evolution Reports** | Proposals formatted as structured reports: theory, code, self-criticism log. | Metacognitive evaluation |
 
 ---
 
