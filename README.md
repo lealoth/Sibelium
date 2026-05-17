@@ -241,6 +241,8 @@ Make sure you have the models in the models/ folder in the base directory, and r
 
 MODEL_PATH = BASE_DIR / "models" / "Llama-3.1-8B-Instruct-Q4_K_M.gguf"    # Main Model
 
+### You can see how to create an entity at: CREATING_ENTITIES.md
+
 ### Run
 py main.py
 
