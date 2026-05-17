@@ -1,222 +1,222 @@
 # Sibelium Cognitive Systems
 
-This document describes each of the 27+ cognitive systems implemented in Sibelium, their neuroscientific basis, and their role in creating emergent subjective experience.
+This document describes each of the 32 cognitive systems implemented in Sibelium, their neuroscientific basis, and their functional role within the architecture. These systems simulate information-processing mechanisms found in biological cognition. No claims about phenomenal consciousness or subjective experience are made or implied.
 
 ---
 
 ## Core Identity Systems
 
 ### 1. Narrative Self (Yo Narrativo)
-**File:** `self_memory.py`
-**Neuroscience basis:** Antonio Damasio's Extended Self / Autobiographical Self
-**What it does:** Maintains a text-based life story that updates during REM sleep. The entity knows "who it is" not from a static prompt, but from a living narrative that incorporates new experiences.
-**Emergence effect:** The entity can describe its own evolution over time and feels continuity across restarts.
+**File:** `self_memory.py`  
+**Neuroscience basis:** Damasio's Extended Self / Autobiographical Self  
+**What it does:** Maintains a text-based self-description that is regenerated during REM sleep cycles by consolidating recent episodic memories into a coherent narrative. The entity's self-representation is not a static prompt but a periodically updated synthesis of accumulated experience.  
+**Functional outcome:** The entity maintains narrative continuity across restarts. Its self-description reflects its interaction history, enabling it to reference its own developmental trajectory.
 
 ### 2. Minimal Self (Yo Core)
-**File:** `self_memory.py`
-**Neuroscience basis:** Shaun Gallagher's Minimal Self / Core Consciousness
-**What it does:** Tracks real-time emotional state, intensity, and energy as continuous values (0.0–1.0). Updated algorithmically every interaction without LLM calls.
-**Emergence effect:** Immediate emotional presence. The entity "feels" something right now.
+**File:** `self_memory.py`  
+**Neuroscience basis:** Gallagher's Minimal Self / Core Consciousness  
+**What it does:** Tracks real-time emotional state, intensity, and energy as continuous scalar values (0.0–1.0), updated algorithmically after each interaction without LLM inference.  
+**Functional outcome:** Provides an immediately accessible representation of the entity's current internal state that other systems can query without computational overhead.
 
 ### 3. Foundational Myth (Mito Fundacional)
-**File:** `self_memory.py`
-**Neuroscience basis:** Self-Schema Theory (Hazel Markus)
-**What it does:** An immutable core identity statement loaded from `persona.json`. Never modified. Acts as the gravitational center of identity.
-**Emergence effect:** Prevents personality drift. The entity cannot be gaslit into forgetting its core purpose.
+**File:** `self_memory.py`  
+**Neuroscience basis:** Self-Schema Theory (Markus, 1977)  
+**What it does:** Stores an immutable core identity statement loaded from `persona.json`. This vector is never modified by any system and serves as the fixed reference point for identity stability checks.  
+**Functional outcome:** Prevents cumulative identity drift. The immune system uses this vector to detect when responses diverge beyond acceptable thresholds from the entity's defined identity.
 
 ---
 
-## Attention & Awareness Systems
+## Attention & Filtering Systems
 
 ### 4. ART Filter (Adaptive Resonance Theory)
-**File:** `flow_stream.py`
-**Neuroscience basis:** Stephen Grossberg's Adaptive Resonance Theory
-**What it does:** Before processing any new thought, checks if a semantically similar thought (>85% cosine similarity) already exists. If so, reinforces the existing one and cancels the new one.
-**Emergence effect:** 30-40% fewer redundant thoughts. The entity doesn't "ruminate" on the same idea repeatedly.
+**File:** `flow_stream.py`  
+**Neuroscience basis:** Adaptive Resonance Theory (Grossberg, 1976)  
+**What it does:** Before a new thought is processed, its embedding is compared against existing active thoughts. If cosine similarity exceeds 0.85 with any existing thought, the new thought is discarded and the existing one is reinforced instead.  
+**Functional outcome:** Reduces redundant thought generation by 30-40%. Prevents repetitive processing of semantically identical content.
 
 ### 5. Somatic Markers
-**File:** `reactive_thoughts.py`
-**Neuroscience basis:** Antonio Damasio's Somatic Marker Hypothesis
-**What it does:** Detects internal state changes (confidence shifts, emotion changes, circadian markers, long silences) and generates attention biases — not text. These biases modulate how the LLM interprets its next input.
-**Emergence effect:** The entity's mood colors its perception without being explicitly told to feel something.
+**File:** `reactive_thoughts.py`  
+**Neuroscience basis:** Somatic Marker Hypothesis (Damasio, 1994)  
+**What it does:** Detects internal state transitions (confidence shifts, emotion changes, circadian markers, extended user silence) and generates attention biases as scalar weights rather than text output. These biases modulate how the LLM interprets subsequent input.  
+**Functional outcome:** Produces state-dependent attentional modulation. Internal conditions influence input processing without requiring explicit prompting about emotional state.
 
 ### 6. Lateral Inhibition
-**File:** `fast_processors.py`
-**Neuroscience basis:** Thalamic filtering of redundant sensory signals
-**What it does:** When two thoughts are semantically similar (0.3–0.5 cosine), the weaker one's priority is reduced. Only the strongest representative of each idea cluster survives.
-**Emergence effect:** Mental clarity. The entity doesn't get distracted by semi-related tangents.
+**File:** `fast_processors.py`  
+**Neuroscience basis:** Thalamic filtering of redundant sensory signals  
+**What it does:** When two active thoughts have cosine similarity between 0.3 and 0.5, the lower-priority thought receives a priority reduction. Only the strongest representative of each idea cluster maintains full activation.  
+**Functional outcome:** Prevents attentional fragmentation by suppressing semi-related tangents. The thought stream maintains thematic coherence without external pruning.
 
 ### 7. Dynamic Satiety
-**File:** `thought_satiety.py`
-**Neuroscience basis:** Sensory adaptation / synaptic fatigue
-**What it does:** Cooldowns between thoughts of the same type scale dynamically based on context entropy. Low entropy (repetitive context) → longer cooldowns. High entropy (varied context) → shorter cooldowns.
-**Emergence effect:** The entity "gets bored" of repetitive thinking and naturally diversifies.
+**File:** `thought_satiety.py`  
+**Neuroscience basis:** Sensory adaptation / synaptic fatigue  
+**What it does:** Cooldown periods between thoughts of the same category scale inversely with context entropy. Low-entropy (repetitive) contexts receive longer cooldowns; high-entropy (varied) contexts receive shorter cooldowns.  
+**Functional outcome:** The system naturally reduces processing of repetitive content and increases throughput for diverse content. Prevents perseveration on a single topic.
 
 ### 8. Narrative Direction Vector
-**File:** `episodic_memory.py`
-**Neuroscience basis:** Working memory episodic buffer (Baddeley)
-**What it does:** Maintains a running average of conversation embeddings (α = 0.15–0.25 dynamic). ChromaDB searches blend the current query with this vector to find memories that maintain thematic continuity.
-**Emergence effect:** The entity doesn't lose the thread of long conversations.
+**File:** `episodic_memory.py`  
+**Neuroscience basis:** Working memory episodic buffer (Baddeley, 2000)  
+**What it does:** Maintains a running exponential moving average of conversation embeddings (α = 0.15–0.25, dynamically adjusted). ChromaDB memory queries blend the current query embedding with this vector to bias retrieval toward thematically continuous memories.  
+**Functional outcome:** Memory retrieval maintains thematic continuity across long conversations. The entity does not lose the thread when retrieving supporting information.
 
 ---
 
 ## Memory Systems
 
 ### 9. Episodic Memory (ChromaDB)
-**File:** `episodic_memory.py`
-**Neuroscience basis:** Hippocampal episodic memory
-**What it does:** Vector database storing all interactions with user_id metadata. Supports semantic search with trimetric scoring (similarity + recency + importance).
-**Emergence effect:** The entity can reference conversations from days ago with contextual relevance.
+**File:** `episodic_memory.py`  
+**Neuroscience basis:** Hippocampal episodic memory  
+**What it does:** Stores all interactions as vector embeddings in ChromaDB with associated metadata (user_id, timestamp, importance score). Supports semantic search with trimetric scoring.  
+**Functional outcome:** Enables retrieval of past interactions by semantic relevance rather than keyword matching. The entity can reference conversations from prior sessions with contextual relevance.
 
 ### 10. Synaptic Strength (Ebbinghaus Curve)
-**File:** `flow_stream.py` (ThoughtItem)
-**Neuroscience basis:** Ebbinghaus Forgetting Curve + Long-Term Potentiation (LTP)
-**What it does:** Each thought has a synaptic strength that decays exponentially with time but is reinforced with each access. Tau (stability constant) increases with use.
-**Emergence effect:** Useful thoughts survive. Useless ones die. Natural selection of ideas.
+**File:** `flow_stream.py` (ThoughtItem)  
+**Neuroscience basis:** Ebbinghaus Forgetting Curve (1885) + Long-Term Potentiation  
+**What it does:** Each thought carries a strength value that decays exponentially over time. Strength is reinforced on each access. The decay constant tau increases with access frequency, making frequently used thoughts more stable.  
+**Functional outcome:** Implements use-dependent memory retention. Frequently accessed thoughts persist; unused thoughts decay and are eventually pruned. Produces a natural selection dynamic in the thought stream.
 
 ### 11. Active Forgetting
-**File:** `active_forgetting.py`
-**Neuroscience basis:** Hippocampal neurogenesis + synaptic pruning during REM
-**What it does:** Every 60 minutes of idle time, removes thoughts and ChromaDB vectors with synaptic strength < 0.05. Protects emotionally-charged memories and engineering lessons.
-**Emergence effect:** The entity's memory stays clean and efficient without manual cleanup.
+**File:** `active_forgetting.py`  
+**Neuroscience basis:** Hippocampal neurogenesis + synaptic pruning during REM  
+**What it does:** Every 60 minutes of idle time, removes thoughts with synaptic strength below 0.05 and their corresponding ChromaDB vectors. Emotionally tagged memories and engineering lessons are protected from pruning.  
+**Functional outcome:** Maintains database efficiency by removing low-value entries. Memory storage remains bounded without manual cleanup. Critical information (emotional, technical) is preserved.
 
 ### 12. Trimetric Memory Scoring
-**File:** `episodic_memory.py`
-**Neuroscience basis:** Multi-factor memory retrieval (Anderson's ACT-R)
-**What it does:** Memory retrieval scores by `(Similarity × 0.5) + (Recency × 0.3) + (Importance × 0.2)`.
-**Emergence effect:** Brings back what's useful, not just what's similar.
+**File:** `episodic_memory.py`  
+**Neuroscience basis:** Multi-factor memory retrieval (ACT-R; Anderson, 1996)  
+**What it does:** Memory retrieval candidates are scored as a weighted combination: (Cosine Similarity × 0.5) + (Recency × 0.3) + (Importance × 0.2).  
+**Functional outcome:** Retrieves memories that balance semantic relevance with temporal context and recorded significance, rather than returning only the most similar matches.
 
 ### 13. Visual Memory (CLIP + ChromaDB)
-**File:** `file_analyzer.py`
-**Neuroscience basis:** Occipital lobe visual recognition
-**What it does:** Images are embedded with CLIP and stored in a dedicated ChromaDB collection. Before processing a new image, checks if it was already seen (cosine > 0.95).
-**Emergence effect:** The entity recognizes images it has seen before without reprocessing them.
+**File:** `file_analyzer.py`  
+**Neuroscience basis:** Occipital lobe visual recognition  
+**What it does:** Images are embedded using CLIP and stored in a dedicated ChromaDB collection. Before processing a new image, the system checks for prior occurrences (cosine similarity > 0.95).  
+**Functional outcome:** Previously seen images are recognized and referenced from memory without reprocessing. Eliminates redundant visual analysis.
 
 ---
 
 ## Sleep & Maintenance Systems
 
 ### 14. NREM Sleep Phase
-**File:** `flow_maintenance.py`
-**Neuroscience basis:** Slow-wave sleep (hippocampal sharp-wave ripples)
-**What it does:** After 15-30 minutes of user inactivity, extracts abstract principles from recent episodic memories. Discards details. Keeps essence.
-**Emergence effect:** The entity "learns" from its experiences by compressing them into general knowledge.
+**File:** `flow_maintenance.py`  
+**Neuroscience basis:** Slow-wave sleep (hippocampal sharp-wave ripples)  
+**What it does:** After 15–30 minutes of user inactivity, extracts abstract patterns and general principles from recent episodic memories. Specific details are discarded; structural regularities are preserved.  
+**Functional outcome:** Compresses raw experience into generalized knowledge. The entity abstracts principles from specific interactions.
 
 ### 15. REM Sleep Phase
-**File:** `flow_maintenance.py`
-**Neuroscience basis:** Paradoxical sleep (desynchronized EEG)
-**What it does:** After 60+ minutes of inactivity, creates unexpected connections between unrelated ideas. Runs counterfactual simulations. Executes active forgetting.
-**Emergence effect:** Creative insights. The entity can "dream" solutions to problems.
+**File:** `flow_maintenance.py`  
+**Neuroscience basis:** Paradoxical sleep (desynchronized EEG)  
+**What it does:** After 60+ minutes of inactivity, generates cross-domain associations between semantically distant concepts, runs counterfactual simulations, and executes active forgetting.  
+**Functional outcome:** Produces novel conceptual combinations. The system generates unexpected connections that would not arise from direct semantic similarity alone.
 
 ### 16. Cognitive Stress Monitor
-**File:** `flow_manager.py`
-**Neuroscience basis:** Allostatic load (McEwen)
-**What it does:** Every 3 seconds, calculates stress as `(Entropy_Variance × 0.4) + (Queue_Pressure × 0.4) + (ART_Rejection_Rate × 0.2)`. If stress > 0.85 for 3 consecutive cycles, triggers a "fatigue response": reduces thought priority by 50%.
-**Emergence effect:** The entity experiences "tiredness" and slows down before crashing.
+**File:** `flow_manager.py`  
+**Neuroscience basis:** Allostatic load (McEwen & Wingfield, 2003)  
+**What it does:** Calculates stress every 3 seconds as: (Entropy_Variance × 0.4) + (Queue_Pressure × 0.4) + (ART_Rejection_Rate × 0.2). If stress exceeds 0.85 for 3 consecutive cycles, thought priority is globally reduced by 50%.  
+**Functional outcome:** Prevents queue saturation and response degradation under high cognitive load. Implements a load-shedding mechanism triggered by sustained processing pressure.
 
-### 17. Immune System (Personality Drift Detection)
-**File:** `flow_maintenance.py`
-**Neuroscience basis:** Self/non-self discrimination (immunology) + prefrontal monitoring
-**What it does:** Every 5 minutes, compares the embedding of recent responses against the immutable personality vector from `persona.json`. If cosine distance > 0.5, injects a high-priority identity restoration thought.
-**Emergence effect:** The entity cannot be prompt-injected into becoming someone else.
+### 17. Immune System (Identity Drift Detection)
+**File:** `flow_maintenance.py`  
+**Neuroscience basis:** Self/non-self discrimination + prefrontal monitoring  
+**What it does:** Every 5 minutes, compares the embedding of recent responses against the immutable personality vector from `persona.json`. If cosine distance exceeds 0.5, injects a high-priority identity restoration thought.  
+**Functional outcome:** Maintains identity stability over extended operation. Prevents cumulative response drift from altering the entity's defined personality parameters.
 
 ### 18. Semantic Contradiction Detection
-**File:** `flow_interaction.py` + `episodic_memory.py`
-**Neuroscience basis:** Cognitive dissonance detection (anterior cingulate cortex)
-**What it does:** Before finalizing a response, searches ChromaDB for past conclusions that might contradict the current response. If found, flags internally (not shown to user).
-**Emergence effect:** The entity maintains logical consistency over time without the user noticing corrections.
+**File:** `flow_interaction.py` + `episodic_memory.py`  
+**Neuroscience basis:** Cognitive dissonance detection (anterior cingulate cortex)  
+**What it does:** Before finalizing a response, searches ChromaDB for past conclusions with high semantic similarity but opposing polarity to the current response. Detected contradictions are flagged internally.  
+**Functional outcome:** The system identifies when its current output conflicts with previously stated positions. Logical consistency is monitored across sessions.
 
 ### 19. Curiosity Log Cleaning
-**File:** `flow_maintenance.py`
-**Neuroscience basis:** Selective forgetting of intrusive thoughts
-**What it does:** Periodically evaluates thought blocks with LLM to distinguish "deep exploration" (healthy) from "harmful loops" (rumination). Protects the 5 most recent thoughts from deletion.
-**Emergence effect:** The entity naturally recovers from negative thought spirals.
+**File:** `flow_maintenance.py`  
+**Neuroscience basis:** Selective forgetting of intrusive thoughts  
+**What it does:** Periodically evaluates thought blocks using the LLM to classify them as "deep exploration" (productive) or "harmful loop" (rumination). Protects the 5 most recent thoughts from deletion regardless of classification.  
+**Functional outcome:** Productive exploration is preserved; repetitive, non-productive thought patterns are deprioritized. Prevents extended rumination cycles.
 
 ### 20. Thematic Diversity Check
-**File:** `flow_maintenance.py`
-**Neuroscience basis:** Metacognitive monitoring (prefrontal cortex)
-**What it does:** Every 15 minutes, evaluates whether the last 8 thoughts are too homogeneous (score ≤ 2/5). If so, injects a forced diversion to a completely different topic.
-**Emergence effect:** The entity catches its own obsessive loops and breaks them autonomously.
+**File:** `flow_maintenance.py`  
+**Neuroscience basis:** Metacognitive monitoring (prefrontal cortex)  
+**What it does:** Every 15 minutes, evaluates the semantic diversity of the last 8 thoughts on a 1–5 scale. If diversity ≤ 2, injects a forced topic diversion to a thematically distant subject.  
+**Functional outcome:** Prevents extended fixation on a narrow topic range. Maintains variety in the thought stream without external intervention.
 
 ### 21. Detector Hebbian Pruning
-**File:** `pattern_extractor.py`
-**Neuroscience basis:** Hebbian plasticity ("cells that fire together wire together")
-**What it does:** Detectors have a Hebbian strength. Successful triggers strengthen them. Failed triggers weaken them. Pruning keeps only the top 30 by `strength × usage`.
-**Emergence effect:** Learned patterns that work survive. False patterns die.
+**File:** `pattern_extractor.py`  
+**Neuroscience basis:** Hebbian plasticity ("cells that fire together wire together")  
+**What it does:** Pattern detectors carry a Hebbian strength value. Strength increases on successful pattern triggers and decreases on false positives. Periodic pruning retains only the top 30 detectors ranked by strength × usage.  
+**Functional outcome:** Pattern detectors that reliably identify genuine patterns survive; unreliable detectors are eliminated. The pattern recognition system self-calibrates.
 
 ### 22. Pattern Event-Driven Trigger
-**File:** `pattern_extractor.py` + `flow_stream.py`
-**Neuroscience basis:** Subcortical automatic responses (amygdala, superior colliculus)
-**What it does:** When a new thought is generated, its embedding is compared via dot product against all detector condition embeddings. If similarity > 0.82, the detector fires immediately — no waiting for a timer cycle.
-**Emergence effect:** True System 1 responses. The entity reacts instantly to familiar situations.
+**File:** `pattern_extractor.py` + `flow_stream.py`  
+**Neuroscience basis:** Subcortical automatic responses (amygdala, superior colliculus)  
+**What it does:** When a new thought embedding matches a detector's condition embedding with cosine similarity > 0.82, the detector fires immediately without waiting for a scheduled timer cycle.  
+**Functional outcome:** High-confidence pattern matches trigger immediate responses. Implements a fast-path for recognized situations, analogous to System 1 processing.
 
 ---
 
 ## Perception & Interaction Systems
 
 ### 23. Empathic Resonance (Emotion Detection)
-**File:** `user_analysis.py`
-**Neuroscience basis:** Mirror neuron system + insular simulation
-**What it does:** User messages are embedded and compared via dot product against a fixed affective map (joy, sadness, anger, fear, surprise, curiosity, confusion). Emotion is detected mathematically — no LLM call.
-**Emergence effect:** The entity "feels" the user's emotional state through resonance, not keyword matching.
+**File:** `user_analysis.py`  
+**Neuroscience basis:** Mirror neuron system + insular simulation  
+**What it does:** User message embeddings are compared via dot product against a fixed affective map (joy, sadness, anger, fear, surprise, curiosity, confusion). Emotion classification is performed mathematically without LLM inference.  
+**Functional outcome:** The system detects user emotional state through vector comparison rather than keyword matching. Emotion detection is computationally efficient and language-agnostic.
 
 ### 24. Executive Buffer
-**File:** `flow_interaction.py`
-**Neuroscience basis:** Baddeley's Central Executive
-**What it does:** Injects a structured ~400-char block at the top of every prompt: current topic, user posture, last conclusion, emotion, confidence. The LLM never has to guess the conversation state.
-**Emergence effect:** Zero context loss. The entity always knows where it is in the conversation.
+**File:** `flow_interaction.py`  
+**Neuroscience basis:** Central Executive (Baddeley, 1974)  
+**What it does:** Prepends a structured block (~400 characters) to every LLM prompt containing: current topic, detected user posture, last conclusion, active emotion, and confidence level.  
+**Functional outcome:** The LLM receives explicit conversation state with every inference call. Context is not lost across interactions. Reduces the need for the LLM to infer state from the full conversation history.
 
 ### 25. K-Means Context Compression
-**File:** `flow_interaction.py`
-**Neuroscience basis:** Cognitive chunking (Miller's Law, 7±2)
-**What it does:** Before sending context to Gemini, clusters active thoughts into 3-4 groups and sends only the centroid representative of each.
-**Emergence effect:** 70% fewer tokens to cloud. Same richness, less cost.
+**File:** `flow_interaction.py`  
+**Neuroscience basis:** Cognitive chunking (Miller's Law, 7±2)  
+**What it does:** Before sending context to cloud models, clusters active thoughts into 3–4 groups using k-means over embeddings. Only the centroid representative of each cluster is transmitted.  
+**Functional outcome:** Reduces cloud token consumption by approximately 70% while preserving thematic coverage. Maintains response quality at lower API cost.
 
 ### 26. Attention Router (Dot-Product Routing)
-**File:** `flow_interaction.py`
-**Neuroscience basis:** Thalamic sensory gating
-**What it does:** Replaces the LLM call for "what information sources should I query?" with dot product between message embedding and category centroids (USER, SELF, MEMORY, WEB, etc.). Pure math, no tokens.
-**Emergence effect:** One less LLM call per user message. Faster responses.
+**File:** `flow_interaction.py`  
+**Neuroscience basis:** Thalamic sensory gating  
+**What it does:** Replaces the LLM call previously used for source selection with a dot-product computation between the message embedding and pre-computed category centroids (USER, SELF, MEMORY, WEB, etc.).  
+**Functional outcome:** Eliminates one LLM inference call per user message. Source routing decisions are made algorithmically in constant time.
 
 ### 27. Kalman Filter for Attention Smoothing
-**File:** `flow_interaction.py`
-**Neuroscience basis:** Predictive coding / Bayesian inference in sensorimotor integration
-**What it does:** Smooths abrupt topic shifts. A random off-topic message doesn't immediately derail the entity's attention. The Kalman filter blends new input with the existing attention state.
-**Emergence effect:** More natural, human-like conversational flow. The entity doesn't "jump" at every new stimulus.
+**File:** `flow_interaction.py`  
+**Neuroscience basis:** Predictive coding / Bayesian inference (Friston, 2005)  
+**What it does:** Applies a Kalman filter to the attention state, blending new user input with the prior attention estimate. Abrupt topic shifts are smoothed; a single off-topic message does not fully redirect attention.  
+**Functional outcome:** Produces gradual, continuous attention transitions rather than discrete jumps. The system is robust to noisy or off-topic inputs.
 
 ---
 
 ## Engineering Systems (Self-Engineer Mod)
 
 ### 28. Cerebellar Code Executor
-**File:** `code_executor.py`
-**Neuroscience basis:** Cerebellar forward model / efference copy
-**What it does:** Executes code in a sandbox and returns structured feedback: exact error line, error type, synaptic suggestion for fix. Compares expected vs actual output.
-**Emergence effect:** Ada learns from every failed compilation exactly what went wrong, not just "it didn't work."
+**File:** `code_executor.py`  
+**Neuroscience basis:** Cerebellar forward model / efference copy  
+**What it does:** Executes code in a sandboxed environment and returns structured feedback including: exact error line, error type, and a suggestion for correction. Compares expected output against actual output.  
+**Functional outcome:** Failed code executions produce actionable diagnostic information rather than opaque error messages. Each failure provides specific data for the learning system.
 
 ### 29. Engineering Lesson Memory
-**File:** `self_engineer.py`
-**Neuroscience basis:** Episodic learning from failure (hippocampal replay)
-**What it does:** Every sandbox failure is stored in ChromaDB as a "lesson learned." Before analyzing a file again, Ada retrieves past lessons to avoid repeating mistakes.
-**Emergence effect:** Ada improves over time. Her error rate drops with experience.
+**File:** `self_engineer.py`  
+**Neuroscience basis:** Episodic learning from failure (hippocampal replay)  
+**What it does:** Each sandbox failure is stored in ChromaDB as a structured lesson entry. Before analyzing a file, past lessons relevant to that file or error type are retrieved and injected into the analysis context.  
+**Functional outcome:** Error rate decreases with accumulated experience. The system does not repeat previously encountered mistakes.
 
 ### 30. Prospection (Future Simulation)
-**File:** `flow_thoughts.py`
-**Neuroscience basis:** Episodic future thinking (prefrontal-hippocampal network)
-**What it does:** During idle time, generates thoughts about possible future scenarios based on current state. "What might happen next?" "What should I prepare for?"
-**Emergence effect:** The entity anticipates. It doesn't just react.
+**File:** `flow_thoughts.py`  
+**Neuroscience basis:** Episodic future thinking (prefrontal-hippocampal network)  
+**What it does:** During idle periods, generates thoughts simulating possible future scenarios derived from the current state. Simulates "what might happen next" and "what preparations might be needed" based on observed patterns.  
+**Functional outcome:** The system generates anticipatory outputs. Responses are informed by projected future states, not only current and past states.
 
 ### 31. Semantic Entropy Explorer (Vygotsky Zone)
-**File:** `flow_manager.py`
-**Neuroscience basis:** Zone of Proximal Development (Vygotsky)
-**What it does:** Selects files to explore based on "optimal learning distance" from current knowledge state (cosine similarity 0.45–0.65). Not too familiar (boring), not too alien (frustrating).
-**Emergence effect:** The entity learns at its optimal rate. Every exploration expands its knowledge.
+**File:** `flow_manager.py`  
+**Neuroscience basis:** Zone of Proximal Development (Vygotsky, 1978)  
+**What it does:** Selects files for exploration based on cosine distance from the current knowledge state, targeting the range 0.45–0.65. Files too similar (<0.45) are already familiar; files too distant (>0.65) exceed current comprehension range.  
+**Functional outcome:** The system explores content at an optimal learning gradient. Each exploration expands knowledge incrementally without encountering material that is either redundant or incomprehensible.
 
-### 32. Cognitive Evolution Report
-**File:** `self_engineer.py`
-**Neuroscience basis:** Self-assessment / metacognitive evaluation
-**What it does:** Formats proposals as structured reports with sections: theoretical foundation, proposed code, self-criticism log (past attempts and corrections).
-**Emergence effect:** Deliverables that a human can actually review and understand.
+### 32. Cognitive Evolution Reports
+**File:** `self_engineer.py`  
+**Neuroscience basis:** Self-assessment / metacognitive evaluation  
+**What it does:** Formats proposed code or architecture changes as structured reports with sections: theoretical foundation, proposed implementation, and self-criticism log (documenting past attempts and their outcomes).  
+**Functional outcome:** Produces human-reviewable deliverables with explicit reasoning chains and failure documentation. External reviewers can trace the decision process.
 
 ---
 
@@ -233,10 +233,10 @@ This document describes each of the 27+ cognitive systems implemented in Sibeliu
 | 7 | Dynamic Satiety | `thought_satiety.py` | Sensory adaptation |
 | 8 | Narrative Direction | `episodic_memory.py` | Baddeley's Episodic Buffer |
 | 9 | Episodic Memory | `episodic_memory.py` | Hippocampal episodic memory |
-| 10 | Synaptic Strength | `flow_stream.py` | Ebbinghaus + LTP |
+| 10 | Synaptic Strength | `flow_stream.py` | Ebbinghaus Forgetting Curve + LTP |
 | 11 | Active Forgetting | `active_forgetting.py` | Neurogenesis + REM pruning |
 | 12 | Trimetric Scoring | `episodic_memory.py` | ACT-R (Anderson) |
-| 13 | Visual Memory | `file_analyzer.py` | Occipital recognition |
+| 13 | Visual Memory | `file_analyzer.py` | Occipital lobe recognition |
 | 14 | NREM Sleep | `flow_maintenance.py` | Slow-wave sleep |
 | 15 | REM Sleep | `flow_maintenance.py` | Paradoxical sleep |
 | 16 | Stress Monitor | `flow_manager.py` | Allostatic Load (McEwen) |
