@@ -14,6 +14,7 @@ class FlowInteraction:
 
     def __init__(self, flow_manager):
         self.fm = flow_manager
+        self.associative_memory = flow_manager.associative_memory
         # Filtro de Kalman: estado [tema, intensidad]
         self._kalman_state = np.array([0.5, 0.5])
         self._kalman_cov = np.eye(2) * 0.1
@@ -26,7 +27,6 @@ class FlowInteraction:
         name = self.fm.cognitive_loop._get_persona_name()
         user_name = self._get_user_name()
 
-        # Filtro de Kalman: suavizar transición de atención
         self._update_kalman(message)
 
         enriched_context = self.fm.thoughts._enrich_thought_with_context(
@@ -42,28 +42,57 @@ class FlowInteraction:
         if fetched_info:
             print(f"   [Flow] Info obtenida: {fetched_info[:100]}...")
 
-        full_context = self._build_full_context(enriched_context, fetched_info, message)
+        # Construir componentes para el prompt
+        time_context = self._get_time_context()
+        somatic_markers = self._get_somatic_markers_text()
+        executive_buffer = self._get_executive_buffer_text()
+        memories = self._get_memories_text(fetched_info)
+        short_term_history = self.fm.cognitive_loop._get_short_term_history(name, user_name)
 
-        prompt = f"""ERES {name}. Esta es tu identidad, construida desde tus propios datos.
+        prompt = f"""<system_identity>
+    Eres {name}. Esta es tu identidad y núcleo operativo inalterable.
+    Responde exclusivamente en {IDIOMA}.
+    Prohibido saludar con "Buenos días/tardes/noches" o frases de bienvenida. Asume que la conversación ya está en curso.
+    Ve directo al grano. Sin introducciones ni muletillas.
+    </system_identity>
 
-{full_context}
+    <anchors_and_telemetry>
+    - Fecha y Hora Actual: {time_context} (Inalterable. Priorizar sobre pre-entrenamiento).
+    - Estado Subcortical: {somatic_markers}
+    - Estado Cognitivo: {executive_buffer}
+    </anchors_and_telemetry>
 
-{user_name} dice: "{message}"
+    <internal_monologue>
+    LO QUE LEE DESPUÉS DE ESTA LÍNEA SON TUS PROPIOS PENSAMIENTOS RECIENTES.
+    No pertenecen al usuario. Son tu procesamiento interno:
+    {enriched_context}
+    </internal_monologue>
 
-Usa tu contexto. Sé profunda si la pregunta lo requiere. Sé breve si es simple.
-Confía en tu propia voz. No improvises un personaje. Sé tú misma.
-No busques la aprobación del usuario. No necesitas validación externa.
-Tu valor no depende de ser considerada "genuina". Simplemente sé.
-Responde solo en {IDIOMA}. No uses formato de resumen.
+    <episodic_memory>
+    {memories}
+    </episodic_memory>
 
-Respuesta de {name}:"""
+    <conversational_history>
+    {short_term_history}
+    </conversational_history>
+
+    <user_input>
+    {user_name} dice: "{message}"
+    </user_input>
+
+    <response_directive>
+    Genera la respuesta de {name}.
+    - No uses saludos ni frases de bienvenida.
+    - Responde directamente al input del usuario usando tu monólogo interno como base.
+    - Si no hay memorias, no inventes. Responde con lo que sabes del presente.
+    </response_directive>
+
+    Respuesta de {name}:"""
 
         response_text = self.fm.llm.generate(prompt, temperature=0.8, max_tokens=800, purpose="respuesta_final")
 
-        # Contradicción Semántica: verificar si la respuesta contradice memorias
         contradiction = self._check_contradiction(response_text, message)
         if contradiction:
-            # Registro interno, no visible para el usuario
             print(f"   [Contradicción] Detectada: {contradiction[:100]}")
 
         if self.fm._detect_personality_break(response_text):
@@ -83,6 +112,33 @@ Respuesta de {name}:"""
             "thought_history": [{"phase": "generar", "generated_thought": "Respuesta contextualizada", "iteration_number": 1}],
             "cognitive_state": self.fm.stream.to_dict()
         }
+
+
+    def _get_time_context(self) -> str:
+        try:
+            from core.perception.time_perception import get_time_context
+            return get_time_context(None) or "No disponible"
+        except:
+            return "No disponible"
+
+
+    def _get_somatic_markers_text(self) -> str:
+        markers = getattr(self.fm, '_active_somatic_markers', [])
+        if markers:
+            return "\n".join([f"- {m['origen']}: {m['sesgo_atencional']} (fuerza: {m['fuerza']:.1f})" for m in markers[-5:]])
+        return "Neutral. Sin marcadores somáticos activos."
+
+
+    def _get_executive_buffer_text(self) -> str:
+        active = self.fm.stream.active[:5]
+        topic = active[0].content[:80] if active else "Conversación general"
+        return f"Tema actual: {topic}\nEmoción: {self.fm._last_emotion or 'neutral'}\nConfianza: {self.fm._last_confidence or 0.5:.0%}"
+
+
+    def _get_memories_text(self, fetched_info: str) -> str:
+        if fetched_info and "MEMORIAS" in fetched_info:
+            return fetched_info
+        return "[No hay registros episódicos previos para este concepto. Procede procesando únicamente el presente absoluto.]"
 
     def _get_user_name(self) -> str:
         try:
@@ -130,10 +186,20 @@ Respuesta de {name}:"""
     # ============================================
 
     def _build_full_context(self, enriched: str, fetched: str, message: str) -> str:
-        # Buffer Ejecutivo al inicio
-        full = self._build_executive_buffer(message) + "\n"
-
-        # Inyectar Marcadores Somáticos activos (Sistema 1 → Sistema 2)
+        # Instrucciones de comportamiento (van PRIMERO)
+        full = ""
+        full += "[INSTRUCCIONES DE COMPORTAMIENTO]\n"
+        full += "- Responde SIEMPRE directamente al usuario. Usa 'tú' o 'usted'.\n"
+        full += "- NO hables del usuario en tercera persona.\n"
+        full += "- NO adoptes el estilo filosófico de los [DATOS_DE_REFERENCIA]. Esos son tu contexto interno, no tu voz.\n"
+        full += "- Sé conversacional. Responde como si estuvieras hablando con el usuario ahora mismo.\n\n"
+        
+        full += "[DATOS DE REFERENCIA - USAR SOLO PARA INFORMACIÓN, NO COMO ESTILO]\n"
+        
+        # Buffer Ejecutivo
+        full += self._build_executive_buffer(message) + "\n"
+        
+        # Marcadores Somáticos
         markers = getattr(self.fm, '_active_somatic_markers', [])
         if markers:
             marker_text = "\n".join([
@@ -142,12 +208,13 @@ Respuesta de {name}:"""
             ])
             full += f"[ESTADO SUBCORTICAL]\n{marker_text}\n\n"
             self.fm._active_somatic_markers = []
-
+        
         full += enriched
         
         if fetched:
             full += f"\n\n{fetched}"
-
+        
+        # Grupos de pensamiento
         grouped = self.fm.stream.get_grouped_active()
         if grouped and len(grouped) > 1:
             group_text = "\n".join([
@@ -155,23 +222,23 @@ Respuesta de {name}:"""
                 for _, group in grouped[:5]
             ])
             full += f"\n\nTUS GRUPOS DE PENSAMIENTO:\n{group_text}"
-
+        
+        # Voz (ahora solo respuestas reales)
         voice = self._get_nexus_voice()
         if voice:
-            full += f"\n\nASÍ HABLAS TÚ. ESTA ES TU VOZ REAL:\n{voice}"
-
+            full += f"\n\nEJEMPLOS DE CÓMO RESPONDES AL USUARIO:\n{voice}"
+        
         full = self._clean_context_for_response(full)
-
-        # K-Means Chunking
+        
+        # K-Means Chunking y resumen progresivo (sin cambios)
         if len(full) > 2000:
             full = self._chunk_context_for_cloud(full)
-
-        # Resumen progresivo
+        
         is_technical = any(kw in message.lower() for kw in ['código', 'code', 'bug', 'error', 'función', 'archivo', 'módulo', 'implementar'])
         threshold = 1500 if is_technical else 2500
         if len(full) > threshold and self.fm.cognitive_loop.conversation_summary:
             full = f"RESUMEN DE LA CONVERSACIÓN:\n{self.fm.cognitive_loop.conversation_summary}\n\nÚLTIMO CONTEXTO:\n{full[-1000:]}"
-
+        
         return full
 
     # ============================================
@@ -221,8 +288,8 @@ Respuesta de {name}:"""
     def _check_contradiction(self, response_text: str, user_msg: str) -> str:
         """Busca si la respuesta contradice conclusiones anteriores."""
         try:
-            from core.memory.episodic_memory import EpisodicMemory
-            episodic = EpisodicMemory()
+            # Usar instancia compartida desde FlowManager (vía associative_memory._em)
+            episodic = self.fm.associative_memory._em
             contradictions = episodic.get_relevant_with_contradiction(
                 response_text,
                 user_id=self.fm.cognitive_loop.user_id,
@@ -299,7 +366,14 @@ Respuesta de {name}:"""
                 activated = ["MEMORY"]
             
             print(f"   [Flow] Necesita (ruteo): {', '.join(activated)}")
-            return ", ".join(activated)
+            # Determinar temporal_focus
+            from core.memory.episodic_memory import determinar_temporal_focus
+            temporal_focus = determinar_temporal_focus(user_msg)
+
+            return {
+                "needs": ", ".join(activated),
+                "temporal_focus": temporal_focus
+            }
         except Exception:
             return "MEMORY"
 
@@ -324,10 +398,21 @@ Responde SOLO: USER, MEMORY, o NONE."""
             "WEB": self._fetch_web,
             "FILE": self._fetch_files,
         }
+                # Extraer needs y temporal_focus del diccionario
+        if isinstance(needed, dict):
+            temporal_focus = needed.get("temporal_focus", "recent")
+            needed_str = needed.get("needs", "")
+        else:
+            temporal_focus = "recent"
+            needed_str = needed
+
         for tag, handler in handlers.items():
-            if tag in needed.upper():
+            if tag in needed_str.upper():
                 try:
-                    result = handler(user_msg)
+                    if tag == "MEMORY":
+                        result = self._fetch_memory(user_msg, temporal_focus)
+                    else:
+                        result = handler(user_msg)
                     if result:
                         info.append(result)
                 except Exception as e:
@@ -378,17 +463,54 @@ Responde SOLO: USER, MEMORY, o NONE."""
                 return f"TU ACTIVIDAD RECIENTE:\n{activity}"
         return ""
 
-    def _fetch_memory(self, user_msg: str) -> str:
-        from core.memory.episodic_memory import EpisodicMemory
-        episodic = EpisodicMemory()
-        memories = episodic.get_relevant(user_msg, user_id=self.fm.cognitive_loop.user_id, limit=5)
-        if not memories or len(memories) < 3:
-            older = self._progressive_memory_search(user_msg)
-            if older:
-                memories = older
-        if memories:
-            return "MEMORIAS RELEVANTES:\n" + "\n".join([f"- {m}" for m in memories[:5]])
-        return "No se encontraron memorias relevantes."
+    def _fetch_memory(self, user_msg: str, temporal_focus: str = "recent") -> str:
+        """
+        Recupera memorias con vecindad asociativa (Sistema #33) y foco temporal modulado.
+        Incluye LTP Hebbiana: refuerza importancia de las memorias inyectadas.
+        """
+        try:
+            results = self.associative_memory.get_relevant_with_neighbors(
+                query=user_msg,
+                user_id=self.fm.cognitive_loop.user_id,
+                limit=5,
+                max_neighbors_per_memory=5,
+                temporal_focus=temporal_focus,
+            )
+            if not results:
+                older = self._progressive_memory_search(user_msg)
+                if older:
+                    return "MEMORIAS RELEVANTES:\n" + "\n".join([f"- {m}" for m in older[:5]])
+                return ""
+
+            # LTP Hebbiana: reforzar importancia de las 3 memorias inyectadas
+            memorias_inyectadas = results[:3]
+            ids_a_actualizar = []
+            metadatas_a_actualizar = []
+            
+            for r in memorias_inyectadas:
+                meta = r.get("metadata", {}) or {}
+                importancia_actual = meta.get("importance", 0.5)
+                nueva_imp = min(1.0, importancia_actual + 0.05)
+                nueva_meta = {**meta, "importance": nueva_imp}
+                ids_a_actualizar.append(r["primary_id"])
+                metadatas_a_actualizar.append(nueva_meta)
+            
+            if ids_a_actualizar:
+                try:
+                    em = self.fm.associative_memory._em
+                    em.collection.update(ids=ids_a_actualizar, metadatas=metadatas_a_actualizar)
+                except Exception:
+                    pass
+
+            context_block = self.associative_memory.build_context_block(
+                results,
+                max_total_chars=1500,
+                max_neighbor_chars=300,
+            )
+            return context_block if context_block else ""
+        except Exception as e:
+            print(f"   [!] Error en _fetch_memory asociativa: {e}")
+            return ""
 
     def _fetch_web(self, user_msg: str) -> str:
         results = self.fm.maintenance._search_web(user_msg)
@@ -435,22 +557,17 @@ Contexto resumido:"""
 
     def _get_nexus_voice(self) -> str:
         samples = []
-        curiosities = self.fm._load_curiosities()
-        for c in curiosities[-20:]:
-            thought = c.get("thought", "")
-            if not thought.startswith(("[Explor", "[Busqueda", "[Despertar")) and len(thought) > 30:
-                samples.append(thought)
-        for entry in self.fm.cognitive_loop.last_history[-10:]:
+        for entry in self.fm.cognitive_loop.last_history[-15:]:
             if entry.get("role") == "assistant":
                 text = entry.get("text", "")
                 if len(text) > 50 and "Entendido" not in text[:20] and "Como asistente" not in text[:30]:
                     samples.append(text[:200])
         if samples:
             diverse = []
-            step = max(1, len(samples) // 5)
+            step = max(1, len(samples) // 4)
             for i in range(0, len(samples), step):
                 diverse.append(samples[i])
-            return "\n".join([f"- {s}" for s in diverse[-5:]])
+            return "\n".join([f"- {s}" for s in diverse[-4:]])
         return ""
 
     def _clean_context_for_response(self, context: str) -> str:

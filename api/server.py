@@ -51,29 +51,6 @@ ALLOWED_EXTENSIONS = {
     '.mp3', '.wav', '.ogg', '.m4a', '.flac'
 }
 
-app = FastAPI(title="Sibelium Cognitive Assistant")
-
-# CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# No-cache para archivos estáticos
-@app.middleware("http")
-async def add_no_cache_headers(request: Request, call_next):
-    response = await call_next(request)
-    path = request.url.path
-    if path.startswith("/css/") or path.startswith("/js/") or path.endswith(".html"):
-        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
-        response.headers["Pragma"] = "no-cache"
-        response.headers["Expires"] = "0"
-    return response
-
-
 # ============================================
 # MODELOS
 # ============================================
@@ -140,28 +117,47 @@ print("✅ Sistema cognitivo creado (flujo detenido).")
 # EVENTOS DE STARTUP
 # ============================================
 
-@app.on_event("startup")
-async def startup_event():
-    """Precarga modelos y arranca el flujo cuando todo está listo."""
-    print("📦 Precargando modelos...")
+print("📦 Precargando modelos...")
     
-    from core.llm import LLMModel
-    llm = LLMModel.get_instance()
-    llm.load_model()
-    print("   ✅ LLMs cargados")
+from core.llm import LLMModel
+llm = LLMModel.get_instance()
+llm.load_model()
+print("   ✅ LLMs cargados")
     
-    from core.perception.file_analyzer import FileAnalyzer
-    FileAnalyzer.get_instance()
-    print("   ✅ BLIP cargado")
+from core.perception.file_analyzer import FileAnalyzer
+FileAnalyzer.get_instance()
+print("   ✅ BLIP cargado")
     
-    # Arrancar flujo de la sesión default (las demás se arrancan al crearse)
-    _default_loop.flow_manager.start()
-    print("   ✅ FlowManager arrancado")
+# Arrancar flujo de la sesión default (las demás se arrancan al crearse)
+_default_loop.flow_manager.start()
+print("   ✅ FlowManager arrancado")
     
-    print("=" * 60)
-    print("🚀 Servidor listo en http://127.0.0.1:8000")
-    print("=" * 60)
+print("=" * 60)
+print("🚀 Servidor listo en http://127.0.0.1:8000")
+print("=" * 60)
 
+
+app = FastAPI(title="Sibelium Cognitive Assistant")
+
+# CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# No-cache para archivos estáticos
+@app.middleware("http")
+async def add_no_cache_headers(request: Request, call_next):
+    response = await call_next(request)
+    path = request.url.path
+    if path.startswith("/css/") or path.startswith("/js/") or path.endswith(".html"):
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+    return response
 
 # ============================================
 # ENDPOINTS DE SESIÓN

@@ -11,4 +11,4 @@ ddgs
 requests
 PyPDF2
 python-multipart
-llama.cpp
+sentence_transformers

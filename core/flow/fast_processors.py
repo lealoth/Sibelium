@@ -49,9 +49,9 @@ class FastCognitiveProcessors:
 
         embeddings = []
         for t in thoughts:
-            emb = getattr(t, '_embedding', None) or FastCognitiveProcessors._get_cached_embedding(t.content)
-            if emb is not None:
-                t._embedding = emb
+            emb = getattr(t, '_embedding', None)
+            if emb is None:
+                emb = FastCognitiveProcessors._get_cached_embedding(t.content)
             embeddings.append(emb)
 
         inhibited = set()
@@ -89,9 +89,9 @@ class FastCognitiveProcessors:
 
         embeddings = []
         for t in thoughts:
-            emb = getattr(t, '_embedding', None) or FastCognitiveProcessors._get_cached_embedding(t.content)
-            if emb is not None:
-                t._embedding = emb
+            emb = getattr(t, '_embedding', None)
+            if emb is None:
+                emb = FastCognitiveProcessors._get_cached_embedding(t.content)
             embeddings.append(emb)
 
         connections = []
