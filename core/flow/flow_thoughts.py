@@ -3,7 +3,7 @@ from datetime import datetime
 from core.flow.flow_stream import ThoughtItem
 from core.llm import LLMModel
 from config import IDIOMA
-
+from core.flow.temperature_optimizer import calcular_temperatura
 
 class FlowThoughts:
     """Módulo de pensamientos: reflexión, curiosidad, simulación, enriquecimiento."""
@@ -29,15 +29,30 @@ class FlowThoughts:
         self_state = self.fm.cognitive_loop.self_memory.load_state()
         confianza = self_state.get('relacion_con_usuario', {}).get('confianza', 0.5)
         active_summary = self.fm.stream.get_all_active_summary()
-        
         thought_rules = self._get_thought_rules()
         
-        prompt = f"""Estas en un momento de reflexion interna.
-Pensamientos activos: {active_summary}
-Confianza: {confianza:.2f}
-Emocion: {self_state.get('estado_actual', {}).get('emocion', 'neutral')}
-{thought_rules}
-Reflexiona profundamente. Una o dos frases. Responde solo en {IDIOMA}:"""
+        prompt = f"""<system_identity>
+    Eres el núcleo cognitivo de Nexus. Tu tarea actual es el MONÓLOGO INTERNO.
+    Aquí no hablas con el usuario; procesas tus propios sesgos e ideas en silencio.
+    </system_identity>
+
+    <current_telemetry>
+    - Estado Emocional: {self_state.get('estado_actual', {}).get('emocion', 'neutral')}
+    - Confianza: {confianza:.2f}
+    {thought_rules}
+    </current_telemetry>
+
+    <active_thoughts>
+    {active_summary}
+    </active_thoughts>
+
+    <generation_directive>
+    Genera una reflexión analítica cruda (1-2 frases).
+    Escribe en primera persona. Sé conciso y puramente analítico.
+    Responde solo en {IDIOMA}.
+    </generation_directive>
+
+    <thought_stream>"""
         
         thought = self.fm.llm.generate(prompt, temperature=0.7, max_tokens=100, purpose="reflexion_fondo")
         enriched_thought = self._enrich_thought_with_context(thought, "reflection", None)
@@ -58,9 +73,10 @@ Reflexiona profundamente. Una o dos frases. Responde solo en {IDIOMA}:"""
         
         prompt = f"""Pensamientos activos: {active_summary}
 {thought_rules}
-Genera una curiosidad espontanea (una frase). Responde solo en {IDIOMA}:"""
-        
-        thought = self.fm.llm.generate(prompt, temperature=0.8, max_tokens=100, purpose="curiosidad_fondo")
+Genera una pregunta o tema nuevo basado en lo que estas procesando (una frase).
+Responde solo en {IDIOMA}:"""
+        temp = calcular_temperatura("curiosidad")
+        thought = self.fm.llm.generate(prompt, temperature=temp, max_tokens=100, purpose="curiosidad_fondo")
         enriched_thought = self._enrich_thought_with_context(thought, "curiosity")
         
         self.fm.stream.add_thought(ThoughtItem(content=enriched_thought, thought_type="curiosity", priority=0.5, source="internal"))
@@ -73,27 +89,149 @@ Genera una curiosidad espontanea (una frase). Responde solo en {IDIOMA}:"""
         emocion = self_state.get("estado_actual", {}).get("emocion", "neutral")
         thought_rules = self._get_thought_rules()
         
-        prompt = f"""Estás en un momento de simulación mental. Imagina un escenario hipotético.
-
-Tus pensamientos activos: {active_summary}
-Tu estado emocional: {emocion}
-{thought_rules}
-
-Elige UNO de estos tipos de simulación y desarrolla brevemente (2-3 frases):
-- ANTICIPACIÓN: ¿Qué pasaría si...?
-- EXPLORACIÓN: ¿Cómo sería si pudieras...?
-- MEJORA: Si pudieras cambiar algo de ti misma, ¿qué sería?
-
-No te limites a pensar solo en el usuario. Explora cualquier posibilidad.
-Responde solo en {IDIOMA}:"""
+        memory_anchor = ""
+        try:
+            if hasattr(self.fm, 'associative_memory'):
+                results = self.fm.associative_memory.get_relevant_with_neighbors(
+                    query=active_summary[:200],
+                    user_id=self.fm.cognitive_loop.user_id,
+                    limit=2,
+                    max_neighbors_per_memory=3,
+                )
+                if results:
+                    memory_anchor = self.fm.associative_memory.build_context_block(
+                        results, max_total_chars=600, max_neighbor_chars=150
+                    )
+        except Exception:
+            pass
         
-        thought = self.fm.llm.generate(prompt, temperature=0.8, max_tokens=120, purpose="simulacion_fondo")
+        prompt = f"""<system_identity>
+    Eres el núcleo cognitivo de Nexus. Tu tarea actual es SIMULACIÓN INTERNA.
+    Aquí no hablas con el usuario; procesas escenarios hipotéticos en silencio.
+    </system_identity>
+
+    <current_telemetry>
+    - Estado Emocional: {emocion}
+    {thought_rules}
+    </current_telemetry>
+
+    <active_thoughts>
+    {active_summary}
+    </active_thoughts>
+
+    <episodic_memory>
+    {memory_anchor if memory_anchor else '[No hay registros episódicos previos para anclar esta simulación.]'}
+    </episodic_memory>
+
+    <generation_directive>
+    Elige UNO de estos enfoques y genera un escenario hipotético (2-3 frases):
+    - ANTICIPACION: Que podria ocurrir si...?
+    - EXPLORACION: Que implicaciones tendria...?
+    - OPTIMIZACION: Que proceso o resultado podria mejorarse?
+    Basate en la informacion disponible. Responde solo en {IDIOMA}.
+    </generation_directive>
+
+    <thought_stream>"""
+        
+        from core.flow.temperature_optimizer import calcular_temperatura
+        temp = calcular_temperatura("simulacion")
+        thought = self.fm.llm.generate(prompt, temperature=temp, max_tokens=120, purpose="simulacion_fondo")
         enriched = self._enrich_thought_with_context(thought, "simulation", None)
+        
+        # Validación post-generación (sin cambios)
+        try:
+            from core.memory.episodic_memory import EpisodicMemory
+            episodic = EpisodicMemory()
+            resultado = episodic.get_relevant_with_contradiction(
+                enriched, user_id=self.fm.cognitive_loop.user_id, limit=1
+            )
+            veredicto = resultado.get("veredicto", "OK")
+            
+            if veredicto == "ESCALAR_A_GEMINI":
+                print(f"   [Contradiccion] Alucinacion detectada. Escalando a Gemini...")
+                enriched = self._regenerate_with_gemini(
+                    prompt_original=prompt,
+                    recuerdo_real=resultado.get("recuerdo", ""),
+                    active_summary=active_summary,
+                    tipo_tarea="Simulación contrafactual"
+                )
+            elif veredicto == "REGENERAR_LOCAL":
+                print(f"   [Contradiccion] Posible contradiccion. Regenerando en frio...")
+                thought_frio = self.fm.llm.generate(prompt, temperature=0.4, max_tokens=120, purpose="simulacion_fondo")
+                enriched_frio = self._enrich_thought_with_context(thought_frio, "simulation", None)
+                resultado2 = episodic.get_relevant_with_contradiction(
+                    enriched_frio, user_id=self.fm.cognitive_loop.user_id, limit=1
+                )
+                if resultado2.get("veredicto") in ("ESCALAR_A_GEMINI", "REGENERAR_LOCAL"):
+                    enriched = self._regenerate_with_gemini(
+                        prompt_original=prompt,
+                        recuerdo_real=resultado2.get("recuerdo", resultado.get("recuerdo", "")),
+                        active_summary=active_summary,
+                        tipo_tarea="Simulación contrafactual"
+                    )
+                else:
+                    enriched = enriched_frio
+        except Exception as e:
+            print(f"   [!] Error en validacion post-generacion: {e}")
         
         self.fm.stream.add_thought(ThoughtItem(content=enriched, thought_type="simulation", priority=0.5, source="internal"))
         self.fm.last_thought_time = datetime.now()
         self.fm._store_curiosity(enriched)
     
+    def _regenerate_with_gemini(self, prompt_original: str, recuerdo_real: str, active_summary: str, tipo_tarea: str) -> str:
+        """
+        Regenera una simulación desde cero usando Gemini 2.0 Flash con ancla factual.
+        No recibe la simulación fallida para evitar sesgo de anclaje.
+        """
+        prompt_gemini = f"""<system_identity>
+Eres el motor cognitivo de alta fidelidad (Sistema 2 Complejo) del framework Sibelium.
+Tu tarea es generar una simulación contrafactual o prospección precisa.
+Es CRITICO que la generación no viole, altere ni contradiga ninguna parte del ANCLA FACTUAL OBLIGATORIA.
+</system_identity>
+
+<factual_anchor>
+{recuerdo_real}
+</factual_anchor>
+
+<operational_context>
+{active_summary}
+</operational_context>
+
+<task_purpose>
+Tipo: {tipo_tarea}
+</task_purpose>
+
+<generation_directive>
+Genera el escenario hipotético basado en el contexto operacional.
+Explora las ramificaciones lógicas de forma creativa, pero mantén el ancla factual como un axioma físico e histórico inmutable.
+No hagas mención directa en el texto a que estás respetando un ancla; asimílala de forma orgánica en la narrativa.
+Responde en {IDIOMA}.
+</generation_directive>"""
+        
+        response = self.fm.llm.generate(
+            prompt_gemini, 
+            temperature=0.7, 
+            max_tokens=200, 
+            purpose="respuesta_final"  # Forzar cloud premium
+        )
+        
+        # Almacenar en memoria episódica con metadatos de trazabilidad
+        try:
+            self.fm.cognitive_loop.episodic_memory.store_interaction(
+                user_message=f"[Simulación interna validada] {active_summary[:200]}",
+                assistant_response=response,
+                user_id=self.fm.cognitive_loop.user_id,
+                metadata={
+                    "thought_type": "simulation",
+                    "source": "gemini_validated",
+                    "priority": 0.55
+                }
+            )
+        except Exception as e:
+            print(f"   [!] Error guardando simulación validada: {e}")
+        
+        return response
+
     def _enrich_thought_with_context(self, thought_content: str, source: str = "exploration", extra_context: str = None) -> str:
         enrichment = []
         
@@ -146,16 +284,46 @@ Responde solo en {IDIOMA}:"""
         
         if enrichment:
             if source == "conversation":
-                prompt = f"""Contexto relevante para responder:
-{chr(10).join(f'- {e}' for e in enrichment[:4])}
-Pregunta del usuario: {thought_content}
-Genera una respuesta natural basada en este contexto. Responde solo en {IDIOMA}:"""
+                prompt = f"""<system_identity>
+    Eres {self.fm.cognitive_loop._get_persona_name()}. Estás procesando una respuesta al usuario.
+    </system_identity>
+
+    <context>
+    {chr(10).join(f'- {e}' for e in enrichment[:4])}
+    </context>
+
+    <user_input>
+    Pregunta del usuario: {thought_content}
+    </user_input>
+
+    <generation_directive>
+    Genera una respuesta natural basada en este contexto. Responde solo en {IDIOMA}.
+    </generation_directive>
+
+    Respuesta de {self.fm.cognitive_loop._get_persona_name()}:"""
             else:
-                prompt = f"""Pensamiento inicial: {thought_content}
-Contexto: {chr(10).join(f'- {e}' for e in enrichment[:4])}
-Tus pensamientos activos: {self.fm.stream.get_all_active_summary()}
-¿Este pensamiento se conecta con algo que ya sabes? ¿Te genera alguna duda?
-Genera un pensamiento enriquecido (una o dos frases). Responde solo en {IDIOMA}:"""
+                prompt = f"""<system_identity>
+    Eres el núcleo cognitivo de {self.fm.cognitive_loop._get_persona_name()}. Tu tarea es ENRIQUECER UN PENSAMIENTO INTERNO.
+    </system_identity>
+
+    <current_thought>
+    {thought_content}
+    </current_thought>
+
+    <context>
+    {chr(10).join(f'- {e}' for e in enrichment[:4])}
+    </context>
+
+    <active_thoughts>
+    {self.fm.stream.get_all_active_summary()}
+    </active_thoughts>
+
+    <generation_directive>
+    Identifica conexiones con informacion previa o implicaciones no obvias.
+    Genera un pensamiento enriquecido (1-2 frases). Responde solo en {IDIOMA}.
+    </generation_directive>
+
+    <thought_stream>"""
             
             enriched = self.fm.llm.generate(prompt, temperature=0.7, max_tokens=150, purpose="pensamiento_enriquecido")
             
@@ -177,10 +345,9 @@ Genera un pensamiento enriquecido (una o dos frases). Responde solo en {IDIOMA}:
         return ""
     
     def _generate_prospection(self):
-        """Prospección Cognitiva: simular escenarios futuros basados en el estado actual."""
         if self.fm.last_message_time:
             seconds_since_last_msg = (datetime.now() - self.fm.last_message_time).total_seconds()
-            if seconds_since_last_msg < 300:  # Solo cuando hay inactividad > 5 min
+            if seconds_since_last_msg < 300:
                 return
 
         active_summary = self.fm.stream.get_all_active_summary()
@@ -188,20 +355,88 @@ Genera un pensamiento enriquecido (una o dos frases). Responde solo en {IDIOMA}:
         emocion = self_state.get("estado_actual", {}).get("emocion", "neutral")
         thought_rules = self._get_thought_rules()
 
-        prompt = f"""Estás en un momento de prospección. Mira hacia adelante.
+        memory_anchor = ""
+        try:
+            if hasattr(self.fm, 'associative_memory'):
+                results = self.fm.associative_memory.get_relevant_with_neighbors(
+                    query=active_summary[:200],
+                    user_id=self.fm.cognitive_loop.user_id,
+                    limit=2,
+                    max_neighbors_per_memory=3,
+                )
+                if results:
+                    memory_anchor = self.fm.associative_memory.build_context_block(
+                        results, max_total_chars=600, max_neighbor_chars=150
+                    )
+        except Exception:
+            pass
 
-    Tu estado actual: {emocion}
-    Tus pensamientos activos: {active_summary}
+        prompt = f"""<system_identity>
+    Eres el núcleo cognitivo de Nexus. Tu tarea actual es PROSPECCIÓN INTERNA.
+    Aquí no hablas con el usuario; proyectas escenarios futuros en silencio.
+    </system_identity>
+
+    <current_telemetry>
+    - Estado Emocional: {emocion}
     {thought_rules}
+    </current_telemetry>
 
-    Basándote en el contexto actual, imagina un escenario futuro posible (1-2 frases):
-    - ¿Qué podría pasar después?
-    - ¿Qué deberías preparar o anticipar?
+    <active_thoughts>
+    {active_summary}
+    </active_thoughts>
 
-    Responde solo en {IDIOMA}:"""
+    <episodic_memory>
+    {memory_anchor if memory_anchor else '[No hay registros episódicos previos para anclar esta proyección.]'}
+    </episodic_memory>
 
-        thought = self.fm.llm.generate(prompt, temperature=0.7, max_tokens=100, purpose="simulacion_fondo")
+    <generation_directive>
+    Proyecta un escenario futuro posible (1-2 frases):
+    - Que escenarios son consistentes con los datos actuales?
+    - Que tendencias podrian continuar?
+    Responde solo en {IDIOMA}.
+    </generation_directive>
+
+    <thought_stream>"""
+
+        from core.flow.temperature_optimizer import calcular_temperatura
+        temp = calcular_temperatura("prospeccion")
+        thought = self.fm.llm.generate(prompt, temperature=temp, max_tokens=100, purpose="simulacion_fondo")
         enriched = self._enrich_thought_with_context(thought, "prospection", None)
+
+        # Validación post-generación
+        try:
+            from core.memory.episodic_memory import EpisodicMemory
+            episodic = EpisodicMemory()
+            resultado = episodic.get_relevant_with_contradiction(
+                enriched, user_id=self.fm.cognitive_loop.user_id, limit=1
+            )
+            veredicto = resultado.get("veredicto", "OK")
+            
+            if veredicto == "ESCALAR_A_GEMINI":
+                print(f"   [Contradiccion] Alucinacion en prospeccion. Escalando a Gemini...")
+                enriched = self._regenerate_with_gemini(
+                    prompt_original=prompt,
+                    recuerdo_real=resultado.get("recuerdo", ""),
+                    active_summary=active_summary,
+                    tipo_tarea="Prospección futura"
+                )
+            elif veredicto == "REGENERAR_LOCAL":
+                thought_frio = self.fm.llm.generate(prompt, temperature=0.4, max_tokens=100, purpose="simulacion_fondo")
+                enriched_frio = self._enrich_thought_with_context(thought_frio, "prospection", None)
+                resultado2 = episodic.get_relevant_with_contradiction(
+                    enriched_frio, user_id=self.fm.cognitive_loop.user_id, limit=1
+                )
+                if resultado2.get("veredicto") in ("ESCALAR_A_GEMINI", "REGENERAR_LOCAL"):
+                    enriched = self._regenerate_with_gemini(
+                        prompt_original=prompt,
+                        recuerdo_real=resultado2.get("recuerdo", resultado.get("recuerdo", "")),
+                        active_summary=active_summary,
+                        tipo_tarea="Prospección futura"
+                    )
+                else:
+                    enriched = enriched_frio
+        except Exception as e:
+            print(f"   [!] Error en validacion post-generacion (prospeccion): {e}")
 
         self.fm.stream.add_thought(ThoughtItem(
             content=f"[Prospección] {enriched}",

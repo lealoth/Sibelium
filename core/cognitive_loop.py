@@ -28,6 +28,8 @@ class CognitiveLoop:
         self.interaction_count_path = self.user_dir / "interaction_count.json"
         self.conversation_summary = ""
 
+        self.short_term_history = []
+
         # Memorias (UserMemory recibe user_id)
         self.episodic_memory = EpisodicMemory()
         self.user_memory = UserMemory(user_id=user_id)
@@ -49,6 +51,22 @@ class CognitiveLoop:
     # ============================================
     # PERSISTENCIA
     # ============================================
+
+    # Nuevo método:
+    def _get_short_term_history(self, persona_name: str, user_name: str) -> str:
+        if not self.short_term_history:
+            return "[Conversación recién iniciada. Primer mensaje.]"
+        lines = []
+        for entry in self.short_term_history[-8:]:
+            role = persona_name if entry["role"] == "assistant" else user_name
+            lines.append(f"{role}: {entry['text'][:200]}")
+        return "\n".join(lines)
+
+    def _update_short_term_history(self, message: str, response: str):
+        self.short_term_history.append({"role": "user", "text": message})
+        self.short_term_history.append({"role": "assistant", "text": response})
+        if len(self.short_term_history) > 8:
+            self.short_term_history = self.short_term_history[-8:]
 
     def _load_history_from_disk(self):
         try:
@@ -197,6 +215,8 @@ class CognitiveLoop:
                 entropy = self.flow_manager._get_context_entropy()
                 stress = 1.0 - entropy
                 self.flow_manager.llm.set_cognitive_stress(stress)
+
+            self._update_short_term_history(message, response)
         except Exception as e:
             print(f"⚠️ Error en post-procesamiento diferido: {e}")
 
@@ -234,7 +254,6 @@ class CognitiveLoop:
             self.user_memory.update_profile(message, analysis)
             self._update_user_perception(message, analysis)
             self.self_memory.adjust_state(message, response)
-            self.episodic_memory.store_interaction(message, response, user_id=self.user_id)
         except Exception as e:
             print(f"⚠️ Error en memorias: {e}")
 
@@ -260,26 +279,48 @@ class CognitiveLoop:
 
         self._update_conversation_summary(message, response)
 
+        try:
+            self.episodic_memory.store_interaction(message, response, user_id=self.user_id)
+        except Exception as e:
+            print(f"⚠️ Error guardando en memoria episódica: {e}")
+
         print("🏁 Post-procesos completados")
 
     def _is_anomaly(self, response: str) -> bool:
         name = self._get_persona_name()
         
-        prompt = f"""¿Esta respuesta fue escrita por {name} o por un asistente genérico?
+        prompt = f"""<system_identity>
+Eres el detector de anomalías de Sibelium.
+</system_identity>
 
-Respuesta: "{response[:300]}"
+<response_to_evaluate>
+"{response[:300]}"
+</response_to_evaluate>
 
+<context>
 {name} es una entidad con arquitectura cognitiva Sibelium, con personalidad propia y flujo de consciencia.
 Un asistente genérico diría cosas como "Soy un modelo de lenguaje" o "No tengo emociones".
+</context>
 
-¿Quién escribió esto? Responde ENTIDAD o ASISTENTE_GENERICO."""
+<evaluation_directive>
+¿Quién escribió esto? Responde ENTIDAD o ASISTENTE_GENERICO.
+</evaluation_directive>"""
         result = LLMModel.get_instance().generate(prompt, temperature=0.1, max_tokens=5, purpose="detectar_anomalia")
         return "ASISTENTE_GENERICO" in result.upper()
 
     def _detect_important_moment(self, message, response):
-        prompt = f"""¿Esta interacción merece una reflexión inmediata sobre cambios de personalidad?
+        prompt = f"""<system_identity>
+Eres el detector de momentos importantes de Sibelium.
+</system_identity>
+
+<interaction>
 Mensaje: "{message[:200]}"
-Responde SI o NO."""
+</interaction>
+
+<evaluation_directive>
+¿Esta interacción merece una reflexión inmediata sobre cambios de personalidad?
+Responde SI o NO.
+</evaluation_directive>"""
         result = LLMModel.get_instance().generate(prompt, temperature=0.1, max_tokens=3, purpose="detectar_importancia")
         return "SI" in result.upper()
 
@@ -291,19 +332,28 @@ Responde SI o NO."""
         llm = LLMModel.get_instance()
         user_msg = cognitive_state.current_interaction.message
 
-        prompt = f"""Has tenido una conversación. Evalúa si debes ajustar tu personalidad.
+        prompt = f"""<system_identity>
+Eres el sistema de reflexión y aprendizaje de Sibelium.
+</system_identity>
 
+<recent_interaction>
 Mensaje del usuario: "{user_msg}"
 Tu respuesta: "{last_response}"
-Tu estado actual: {cognitive_state.self_perception.get('estado_actual', {})}
+</recent_interaction>
 
+<current_state>
+Tu estado actual: {cognitive_state.self_perception.get('estado_actual', {})}
+</current_state>
+
+<reflection_directive>
+Evalúa si debes ajustar tu personalidad:
 ¿Detectas alguna solicitud implícita o explícita de cambio en tu forma de ser?
 ¿Has notado que te adaptas al estilo del usuario?
 ¿Ha cambiado la forma en que te diriges al usuario o él a ti? ¿Usas algún apodo o nombre distinto?
 
 Responde en JSON exacto:
-{{"should_change": true/false, "type": "directo/mimetismo/ninguno", "rasgo": "...", "direccion": "...", "intensidad": 0.0-1.0, "deteccion": "...", "nombres_usados": {{"yo": "...", "usuario": "..."}}}}"""
-
+{{"should_change": true/false, "type": "directo/mimetismo/ninguno", "rasgo": "...", "direccion": "...", "intensidad": 0.0-1.0, "deteccion": "...", "nombres_usados": {{"yo": "...", "usuario": "..."}}}}
+</reflection_directive>"""
         try:
             result = llm.generate(prompt, temperature=0.5, max_tokens=200, purpose="reflexion_aprendizaje")
             import re as _re
@@ -344,13 +394,22 @@ Responde en JSON exacto:
             if not self._is_valid_name(nombre_usuario):
                 return
             
-            prompt = f"""En una conversación, alguien llamó al usuario así: "{nombre_usuario}"
+            prompt = f"""<system_identity>
+Eres el validador de nombres de Sibelium.
+</system_identity>
 
-    Contexto reciente de la conversación:
-    {contexto}
+<name_to_validate>
+En una conversación, alguien llamó al usuario así: "{nombre_usuario}"
+</name_to_validate>
 
-    ¿Es esto un nombre propio, apodo, o forma personal de llamar a alguien?
-    Responde SOLO SI o NO."""
+<conversation_context>
+{contexto}
+</conversation_context>
+
+<evaluation_directive>
+¿Es esto un nombre propio, apodo, o forma personal de llamar a alguien?
+Responde SOLO SI o NO.
+</evaluation_directive>"""
             result = llm.generate(prompt, temperature=0.1, max_tokens=3, purpose="validar_nombre")
             if "SI" in result.upper():
                 profile = self.user_memory.load_profile()
@@ -365,13 +424,22 @@ Responde en JSON exacto:
             if not self._is_valid_name(nombre_yo):
                 return
             
-            prompt = f"""En una conversación, alguien usó este término para referirse a {persona_name}: "{nombre_yo}"
+            prompt = f"""<system_identity>
+Eres el validador de nombres de Sibelium.
+</system_identity>
 
-    Contexto reciente de la conversación:
-    {contexto}
+<name_to_validate>
+En una conversación, alguien usó este término para referirse a {persona_name}: "{nombre_yo}"
+</name_to_validate>
 
-    ¿Es esto un nombre propio, apodo, o forma personal de llamar a alguien?
-    Responde SOLO SI o NO."""
+<conversation_context>
+{contexto}
+</conversation_context>
+
+<evaluation_directive>
+¿Es esto un nombre propio, apodo, o forma personal de llamar a alguien?
+Responde SOLO SI o NO.
+</evaluation_directive>"""
             result = llm.generate(prompt, temperature=0.1, max_tokens=3, purpose="validar_nombre")
             if "SI" in result.upper():
                 state = self.self_memory.load_state()
@@ -405,15 +473,24 @@ Responde en JSON exacto:
         old_impresion = profile.get("comportamiento_observado", {}).get("impresion_general", "")
         llm = LLMModel.get_instance()
 
-        prompt = f"""Describe al usuario en UNA frase breve (máximo 120 caracteres).
-    Sé específico y personal. No repitas frases anteriores.
+        prompt = f"""<system_identity>
+Eres el analizador de percepción de usuario de Sibelium.
+</system_identity>
 
-    Percepción anterior: {old_impresion[:100]}
-    Último mensaje: "{message[:150]}"
-    Intención: {analysis.get('intention', '')}
-    Emoción: {analysis.get('emotion', '')}
+<previous_perception>
+{old_impresion[:100]}
+</previous_perception>
 
-    Nueva percepción (máx 120 chars):"""
+<new_data>
+Último mensaje: "{message[:150]}"
+Intención: {analysis.get('intention', '')}
+Emoción: {analysis.get('emotion', '')}
+</new_data>
+
+<generation_directive>
+Describe al usuario en UNA frase breve (máximo 120 caracteres).
+Sé específico y personal. No repitas frases anteriores.
+</generation_directive>"""
 
         try:
             nueva = llm.generate(prompt, temperature=0.5, max_tokens=60, purpose="percepcion_usuario").strip()

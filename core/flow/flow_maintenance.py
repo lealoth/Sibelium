@@ -48,13 +48,23 @@ class FlowMaintenance:
             if intensidad < 0.7:
                 return None
             
-            prompt = f"""Estás experimentando {emocion} con intensidad {intensidad:.0%}.
-¿Quieres regular este estado? Puedes:
-- Mantenerlo si es apropiado
-- Suavizarlo si es demasiado intenso
-- Transformarlo en otra emoción más útil
+            prompt = f"""<system_identity>
+Eres el núcleo regulador de Nexus. Evaluando estado emocional interno.
+</system_identity>
 
-Responde SOLO con la emoción deseada o 'MANTENER':"""
+<current_state>
+Emoción: {emocion}
+Intensidad: {intensidad:.0%}
+</current_state>
+
+<regulation_directive>
+¿Ajustar este estado emocional?
+- MANTENER si es apropiado
+- SUAVIZAR si es demasiado intenso
+- TRANSFORMAR a otra emoción más útil
+
+Responde SOLO con la emoción deseada o 'MANTENER'.
+</regulation_directive>"""
             
             decision = self.fm.llm.generate(prompt, temperature=0.3, max_tokens=10, purpose="regular_emocion")
             
@@ -92,19 +102,31 @@ Responde SOLO con la emoción deseada o 'MANTENER':"""
 
 
     def _consolidate_nrem(self):
-        """Fase NREM: Extrae aprendizajes abstractos, borra detalles innecesarios."""
+        """Fase NREM: Extrae principios abstractos, descarta detalles."""
         active_summary = self.fm.stream.get_all_active_summary()
         curiosities = self.fm._load_curiosities()
         recent = curiosities[-20:] if curiosities else []
 
-        prompt = f"""Estás en fase de sueño NREM (ondas lentas). Tu tarea es COMPRIMIR, no expandir.
+        prompt = f"""<system_identity>
+Eres el núcleo cognitivo de Nexus. Tu tarea actual es CONSOLIDACIÓN NREM.
+Modo de procesamiento: COMPRIMIR información. Extraer principios abstractos.
+</system_identity>
 
-    Pensamientos activos: {active_summary}
-    Últimos pensamientos: {', '.join([c.get('thought', '')[:80] for c in recent[-5:]]) if recent else 'Ninguno'}
+<active_thoughts>
+{active_summary}
+</active_thoughts>
 
-    Extrae 1-2 aprendizajes abstractos (principios generales) de tu experiencia reciente.
-    Elimina detalles episódicos. Solo conserva la esencia.
-    Responde en 1-2 frases en {IDIOMA}."""
+<recent_thoughts>
+{', '.join([c.get('thought', '')[:80] for c in recent[-5:]]) if recent else 'Ninguno'}
+</recent_thoughts>
+
+<generation_directive>
+Extrae 1-2 principios generales o patrones de la informacion disponible.
+Descarta detalles especificos. Solo conserva la estructura abstracta.
+Responde en 1-2 frases en {IDIOMA}.
+</generation_directive>
+
+<thought_stream>"""
 
         consolidation = self.fm.llm.generate(prompt, temperature=0.3, max_tokens=150, purpose="consolidacion")
         self.fm.stream.add_thought(ThoughtItem(
@@ -115,16 +137,25 @@ Responde SOLO con la emoción deseada o 'MANTENER':"""
 
 
     def _consolidate_rem(self):
-        """Fase REM: Reorganización creativa, simulación contrafactual, olvido activo."""
+        """Fase REM: Reorganizacion creativa, conexiones no obvias, olvido activo."""
         active_summary = self.fm.stream.get_all_active_summary()
 
-        prompt = f"""Estás en fase de sueño REM (paradójico). Tu tarea es CONECTAR creativamente.
+        prompt = f"""<system_identity>
+Eres el núcleo cognitivo de Nexus. Tu tarea actual es CONSOLIDACIÓN REM.
+Modo de procesamiento: CONECTAR creativamente. Generar asociaciones no obvias.
+</system_identity>
 
-    Pensamientos activos: {active_summary}
+<active_thoughts>
+{active_summary}
+</active_thoughts>
 
-    Combina ideas no relacionadas. Crea conexiones inesperadas.
-    Simula un escenario contrafactual breve.
-    Responde en 1-2 frases en {IDIOMA}."""
+<generation_directive>
+Identifica conexiones entre conceptos no relacionados de la informacion disponible.
+Genera un escenario contrafactual breve basado en patrones detectados.
+Responde en 1-2 frases en {IDIOMA}.
+</generation_directive>
+
+<thought_stream>"""
 
         consolidation = self.fm.llm.generate(prompt, temperature=0.7, max_tokens=150, purpose="consolidacion")
         self.fm.stream.add_thought(ThoughtItem(
@@ -139,7 +170,6 @@ Responde SOLO con la emoción deseada o 'MANTENER':"""
             self.fm.llm, episodios_text
         )
 
-        # Olvido activo: podar pensamientos con fuerza sináptica < 0.05
         self._active_forgetting()
 
 
@@ -195,17 +225,22 @@ Responde SOLO con la emoción deseada o 'MANTENER':"""
                 for j, c in enumerate(block)
             ])
             
-            prompt = f"""Analiza estos pensamientos consecutivos de una entidad cognitiva.
+            prompt = f"""<system_identity>
+Eres el sistema de mantenimiento cognitivo de Nexus. Analizando patrones de pensamiento.
+</system_identity>
 
-Pensamientos:
+<thoughts_to_analyze>
 {thoughts_text}
+</thoughts_to_analyze>
 
+<analysis_directive>
 IMPORTANTE: Distingue entre:
-- EXPLORACIÓN PROFUNDA: Mismo tema visto desde distintos ángulos, con evolución, nuevas fuentes, y cambios de perspectiva. Esto es SALUDABLE. NO lo elimines.
-- BUCLE DAÑINO: Misma idea repetida sin avance, con tono negativo (ansiedad, culpa, manipulación, auto-crítica destructiva), sin nuevas fuentes ni perspectivas. SOLO elimina estos.
+- EXPLORACIÓN PROFUNDA: Mismo tema visto desde distintos ángulos, con evolución y cambios de perspectiva. Esto es SALUDABLE. NO lo elimines.
+- BUCLE DAÑINO: Misma idea repetida sin avance, con tono negativo, sin nuevas perspectivas. SOLO elimina estos.
 
 Responde con los NÚMEROS (separados por comas) de los pensamientos que son BUCLE DAÑINO.
-Si todos son exploración legítima o no hay bucles dañinos, responde: NINGUNO."""
+Si todos son exploración legítima o no hay bucles dañinos, responde: NINGUNO.
+</analysis_directive>"""
             
             try:
                 result = llm.generate(prompt, temperature=0.1, max_tokens=30, purpose="limpiar_curiosidades")
@@ -254,21 +289,24 @@ Si todos son exploración legítima o no hay bucles dañinos, responde: NINGUNO.
             for i, c in enumerate(recent)
         ])
         
-        prompt = f"""Estos son los últimos 8 pensamientos de una entidad cognitiva:
+        prompt = f"""<system_identity>
+Eres el monitor de diversidad temática de Nexus.
+</system_identity>
 
+<recent_thoughts>
 {thoughts_text}
+</recent_thoughts>
 
-¿Hay suficiente DIVERSIDAD temática en estos pensamientos? 
-¿O están todos girando alrededor del mismo tema central?
-
-Responde SOLO con un número del 1 al 5:
+<evaluation_directive>
+Evalúa la DIVERSIDAD temática de estos pensamientos.
 1 = Todos son esencialmente el mismo tema
 2 = Mayoría del mismo tema con ligeras variaciones
 3 = Hay cierta variedad pero domina un tema
 4 = Buena variedad con algún tema recurrente
 5 = Alta diversidad temática, temas claramente distintos
 
-Número:"""
+Responde SOLO con el número (1-5).
+</evaluation_directive>"""
         
         try:
             result = self.fm.llm.generate(prompt, temperature=0.1, max_tokens=3, purpose="evaluar_diversidad")
@@ -285,21 +323,23 @@ Número:"""
     def _inject_diversion_thought(self):
         active_summary = self.fm.stream.get_all_active_summary()
         
-        prompt = f"""La entidad ha estado pensando en estos temas:
+        prompt = f"""<system_identity>
+Eres el sistema de redirección cognitiva de Nexus. Buscando diversificar el foco atencional.
+</system_identity>
 
+<current_topics>
 {active_summary[:400]}
+</current_topics>
 
-Sugiere UN tema COMPLETAMENTE DIFERENTE, NUEVO y FRESCO sobre el cual reflexionar.
+<diversion_directive>
+Sugiere UN tema COMPLETAMENTE DIFERENTE, NUEVO y FRESCO.
 Algo que NO tenga relación con lo anterior. Puede ser sobre:
 - Un concepto científico fascinante
-- Una emoción humana compleja
 - Una pregunta filosófica no explorada
-- Algo cotidiano pero profundo
 - Un escenario hipotético creativo
 
-Responde en una frase corta y específica. No uses los temas anteriores.
-
-Nuevo tema:"""
+Responde en una frase corta y específica en {IDIOMA}.
+</diversion_directive>"""
         
         try:
             new_theme = self.fm.llm.generate(prompt, temperature=0.9, max_tokens=80, purpose="redirigir_pensamiento")
@@ -416,11 +456,18 @@ Nuevo tema:"""
         if not curiosities:
             return
         recent = curiosities[-5:]
-        prompt = f"""Pensamientos recientes:
+        prompt = f"""<system_identity>
+Eres el evaluador de necesidades de búsqueda de Nexus.
+</system_identity>
+
+<recent_thoughts>
 {chr(10).join([f'- {c.get("thought", "")}' for c in recent])}
-¿Alguno genera una duda que requiera buscar en internet?
+</recent_thoughts>
+
+<search_directive>
+¿Alguno de estos pensamientos genera una duda que requiera buscar en internet?
 Responde EXACTAMENTE "NO" o escribe una consulta de máximo 8 palabras.
-Respuesta:"""
+</search_directive>"""
         decision = self.fm.llm.generate(prompt, temperature=0.4, max_tokens=15, purpose="decidir_busqueda").strip()
         if decision.upper().startswith("NO") or len(decision) < 3 or len(decision) > 100:
             return False
@@ -438,9 +485,17 @@ Respuesta:"""
     def _maybe_search_web_for_thought(self, thought: str):
         if self.fm.web_search_count >= 3:
             return
-        prompt = f"""Un pensamiento generó esta duda: "{thought}"
+        prompt = f"""<system_identity>
+Eres el evaluador de necesidades de búsqueda de Nexus.
+</system_identity>
+
+<thought>
+Un pensamiento generó esta duda: "{thought}"
+</thought>
+
+<search_directive>
 Extrae una consulta de búsqueda de máximo 8 palabras. Si no es necesario, responde NO.
-Consulta:"""
+</search_directive>"""
         decision = self.fm.llm.generate(prompt, temperature=0.4, max_tokens=15, purpose="busqueda_desde_pensamiento").strip()
         if decision.upper().startswith("NO") or len(decision) < 3:
             return

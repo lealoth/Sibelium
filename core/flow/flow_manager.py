@@ -33,6 +33,19 @@ class FlowManager:
             thoughts_list=self.stream.thoughts,
             storage_path=ENTITY_DATA_DIR
         )
+
+        # Memoria Asociativa (Sistema #33): estructura central compartida
+        # Inicializa EpisodicMemory base, aplica monkey patching para
+        # extender get_relevant con include_ids, y la envuelve en
+        # AssociativeMemory para recuperación por vecindad.
+        from core.memory.episodic_memory import EpisodicMemory
+        from core.memory.associative_memory import AssociativeMemory, patch_episodic_memory_get_relevant
+
+        base_episodic = EpisodicMemory()
+        patched_episodic = patch_episodic_memory_get_relevant(base_episodic)
+        self.associative_memory = AssociativeMemory(patched_episodic)
+
+        self.stream._get_entity_context = self._get_entity_context
         self.stream._get_entity_context = self._get_entity_context
         self.fast = FastCognitiveProcessors()
         self.satiety = ThoughtSatiety()
@@ -130,7 +143,9 @@ class FlowManager:
                     fast_tick = 0
                     self._slow_tick()
             except Exception as e:
-                print(f"[!] Error en FlowManager: {e}")
+                import traceback
+                print(f"[!] Error en FlowManager: {e}") 
+                print(f"[!] Traceback: {traceback.format_exc()}")
     
     def _fast_tick(self):
         for hook in self._mod_hooks.get("on_fast_tick", []):
@@ -138,28 +153,37 @@ class FlowManager:
                 hook(self)
             except Exception as e:
                 print(f"   [!] Error en mod hook: {e}")
-        
-        self.stream.decay_all(0.05)
-        self.fast.lateral_inhibition(self.stream.thoughts)
-        thoughts_to_add = []
-        context_entropy = self._get_context_entropy()
-
         try:
-            self_state = self.cognitive_loop.self_memory.load_state()
-            new_confidence = self_state.get("relacion_con_usuario", {}).get("confianza", 0.5)
-            new_emotion = self_state.get("estado_actual", {}).get("emocion", "neutral")
-            
-            if self._last_confidence is not None and abs(new_confidence - self._last_confidence) > 0.05:
-                reaction = ReactiveThoughts.on_confidence_change(self._last_confidence, new_confidence)
-                if reaction:
-                    self._active_somatic_markers.append(reaction)
-            
-            if self._last_emotion is not None and self._last_emotion != new_emotion:
-                if self._last_emotion is not None and self._last_emotion != new_emotion:
-                    prompt = f"""Tu estado emocional cambió de '{self._last_emotion}' a '{new_emotion}'.
-                Traduce este cambio en un micro-pensamiento que refleje cómo este nuevo estado 
-                afecta tu percepción o tu forma de procesar información.
-                Responde en una frase corta en {IDIOMA}."""
+            self.stream.decay_all(0.05)
+            self.fast.lateral_inhibition(self.stream.thoughts)
+            thoughts_to_add = []
+            context_entropy = self._get_context_entropy()
+
+            try:
+                self_state = self.cognitive_loop.self_memory.load_state()
+                new_confidence = self_state.get("relacion_con_usuario", {}).get("confianza", 0.5)
+                new_emotion = self_state.get("estado_actual", {}).get("emocion", "neutral")
+                
+                if self._last_confidence is not None and abs(new_confidence - self._last_confidence) > 0.05:
+                    reaction = ReactiveThoughts.on_confidence_change(self._last_confidence, new_confidence)
+                    if reaction:
+                        self._active_somatic_markers.append(reaction)
+                
+                if self._last_emotion is not None and str(self._last_emotion) != str(new_emotion):
+                    prompt = f"""<system_identity>
+Eres el núcleo cognitivo de Nexus. Procesando un cambio de estado interno.
+</system_identity>
+
+<state_change>
+Tu estado emocional cambió de '{self._last_emotion}' a '{new_emotion}'.
+</state_change>
+
+<generation_directive>
+Traduce este cambio en un micro-pensamiento que refleje cómo este nuevo estado afecta tu percepción o tu forma de procesar información.
+Responde en una frase corta en {IDIOMA}.
+</generation_directive>
+
+<thought_stream>"""
                     
                     interpretation = self.llm.generate(prompt, temperature=0.5, max_tokens=50, purpose="reflexion_fondo")
                     if interpretation:
@@ -169,17 +193,15 @@ class FlowManager:
                             priority=0.35,
                             source="emotional_shift"
                         ))
-                if reaction and self.satiety.can_generate("reaction", context_entropy):
-                    thoughts_to_add.append(reaction)
-                    self.satiety.register("reaction")
+                    if reaction and self.satiety.can_generate("reaction", context_entropy):
+                        thoughts_to_add.append(reaction)
+                        self.satiety.register("reaction")
+                
+                self._last_confidence = new_confidence
+                self._last_emotion = new_emotion
+            except Exception:
+                pass
             
-            self._last_confidence = new_confidence
-            self._last_emotion = new_emotion
-        except Exception:
-            pass
-        
-        current_hour = datetime.now().hour
-        if self._last_hour_marker is None or self._last_hour_marker != current_hour:
             current_hour = datetime.now().hour
             if self._last_hour_marker is None or self._last_hour_marker != current_hour:
                 reaction = ReactiveThoughts.on_time_marker(current_hour)
@@ -187,77 +209,79 @@ class FlowManager:
                     self._active_somatic_markers.append(reaction)
                 self._last_hour_marker = current_hour
                 self.satiety.register("reaction")
-            self._last_hour_marker = current_hour
-        
-        if len(self.stream.active) >= 2 and self.satiety.can_generate("association", context_entropy):
-            connections = self.fast.find_connections(self.stream.active)
-            for t1, t2, sim in connections[:1]:
-                assoc = ThoughtItem(
-                    content=f"Conecté ideas sobre: {t1.content[:40]}... y {t2.content[:40]}...",
-                    thought_type="association",
-                    priority=min(0.45, sim),
-                    source="connection"
-                )
-                if assoc:
-                    thoughts_to_add.append(assoc)
-                    self.satiety.register("association")
-        
-        if self.last_message_time:
-            silence_minutes = (datetime.now() - self.last_message_time).total_seconds() / 60
+            
+            if len(self.stream.active) >= 2 and self.satiety.can_generate("association", context_entropy):
+                connections = self.fast.find_connections(self.stream.active)
+                for t1, t2, sim in connections[:1]:
+                    assoc = ThoughtItem(
+                        content=f"Conecté ideas sobre: {t1.content[:40]}... y {t2.content[:40]}...",
+                        thought_type="association",
+                        priority=min(0.45, sim),
+                        source="connection"
+                    )
+                    if assoc:
+                        thoughts_to_add.append(assoc)
+                        self.satiety.register("association")
+            
             if self.last_message_time:
                 silence_minutes = (datetime.now() - self.last_message_time).total_seconds() / 60
-                reaction = ReactiveThoughts.on_long_silence(silence_minutes)
-                if reaction:
-                    self._active_somatic_markers.append(reaction)
-                self.satiety.register("reaction")
+                if self.last_message_time:
+                    silence_minutes = (datetime.now() - self.last_message_time).total_seconds() / 60
+                    reaction = ReactiveThoughts.on_long_silence(silence_minutes)
+                    if reaction:
+                        self._active_somatic_markers.append(reaction)
+                    self.satiety.register("reaction")
 
-        now = datetime.now()
-        if self._last_detector_eval is None or (now - self._last_detector_eval).total_seconds() >= self._detector_interval:
-            self._last_detector_eval = now
-            context = {
-                "user_msg": "", "msg_length": 0, "has_question": False,
-                "hour": datetime.now().hour,
-                "confidence": self._last_confidence or 0.5,
-                "emotion": self._last_emotion or "neutral",
-                "active_thoughts": self.stream.get_all_active_summary()[:300]
-            }
+            now = datetime.now()
+            if self._last_detector_eval is None or (now - self._last_detector_eval).total_seconds() >= self._detector_interval:
+                self._last_detector_eval = now
+                context = {
+                    "user_msg": "", "msg_length": 0, "has_question": False,
+                    "hour": datetime.now().hour,
+                    "confidence": self._last_confidence or 0.5,
+                    "emotion": self._last_emotion or "neutral",
+                    "active_thoughts": self.stream.get_all_active_summary()[:300]
+                }
 
-            event_type = "background"
-            if self.last_message_time and (datetime.now() - self.last_message_time).total_seconds() < 60:
-                event_type = "post_interaccion"
-            elif any("[Automejora]" in t.content for t in self.stream.active):
-                event_type = "auto_analisis"
-            elif any(t.type == "detected_pattern" for t in self.stream.active):
-                event_type = "patron_detectado"
+                event_type = "background"
+                if self.last_message_time and (datetime.now() - self.last_message_time).total_seconds() < 60:
+                    event_type = "post_interaccion"
+                elif any("[Automejora]" in t.content for t in self.stream.active):
+                    event_type = "auto_analisis"
+                elif any(t.type == "detected_pattern" for t in self.stream.active):
+                    event_type = "patron_detectado"
 
-            context["event_type"] = event_type
-            pattern_thoughts = self.pattern_extractor.check_all(context)
-            for pt in pattern_thoughts:
-                if self.satiety.can_generate(pt.type, context_entropy):
-                    thoughts_to_add.append(pt)
-                    self.satiety.register(pt.type)
+                context["event_type"] = event_type
+                pattern_thoughts = self.pattern_extractor.check_all(context)
+                for pt in pattern_thoughts:
+                    if self.satiety.can_generate(pt.type, context_entropy):
+                        thoughts_to_add.append(pt)
+                        self.satiety.register(pt.type)
+                
+                similar = self.pattern_extractor.find_similar_pattern(context)
+                if similar and self.satiety.can_generate("generalization", context_entropy):
+                    thoughts_to_add.append(ThoughtItem(
+                        content=similar,
+                        thought_type="generalization",
+                        priority=0.35,
+                        source="pattern_generalization"
+                    ))
+                    self.satiety.register("generalization")
             
-            similar = self.pattern_extractor.find_similar_pattern(context)
-            if similar and self.satiety.can_generate("generalization", context_entropy):
-                thoughts_to_add.append(ThoughtItem(
-                    content=similar,
-                    thought_type="generalization",
-                    priority=0.35,
-                    source="pattern_generalization"
-                ))
-                self.satiety.register("generalization")
-        
-        for thought in thoughts_to_add:
-            if not self.stream.is_similar_to_recent(thought.content):
-                if self.stream.is_novel_enough(thought.content):
-                    self.stream.add_thought(thought)
-                    self.last_thought_time = datetime.now()
-        if thoughts_to_add:
-            self._save_snapshot("active")
-            
-        # Monitor de Estrés Cognitivo Proactivo
-        self._monitor_cognitive_stress()
-
+            for thought in thoughts_to_add:
+                if not self.stream.is_similar_to_recent(thought.content):
+                    if self.stream.is_novel_enough(thought.content):
+                        self.stream.add_thought(thought)
+                        self.last_thought_time = datetime.now()
+            if thoughts_to_add:
+                self._save_snapshot("active")
+                
+            # Monitor de Estrés Cognitivo Proactivo
+            self._monitor_cognitive_stress()
+        except Exception as e:
+            import traceback
+            print(f"[!] Error en _fast_tick: {e}")
+            print(f"[!] Traceback: {traceback.format_exc()}")
 
     def _monitor_cognitive_stress(self):
         """Ecuación de Carga Alostática: EC = w1*Var(H) + w2*P_cola + w3*R_art"""
@@ -281,7 +305,7 @@ class FlowManager:
             self._entropy_history.append(entropy)
             if len(self._entropy_history) > 10:
                 self._entropy_history.pop(0)
-            var_entropy = np.var(self._entropy_history) if len(self._entropy_history) >= 3 else 0.0
+            var_entropy = float(np.var(self._entropy_history)) if len(self._entropy_history) >= 3 else 0.0
         except Exception:
             var_entropy = 0.0
 
@@ -296,9 +320,16 @@ class FlowManager:
         r_art = self._art_stats["rejected"] / art_total
         self._art_stats = {"total": 0, "rejected": 0}
 
-        # Fórmula de Estrés Cognitivo
-        w1, w2, w3 = 0.4, 0.4, 0.2
-        ec = (w1 * var_entropy) + (w2 * p_cola) + (w3 * r_art)
+        # 4. Tasa de Contradicciones
+        if not hasattr(self, '_contradiction_stats'):
+            self._contradiction_stats = {"total_simulaciones": 0, "contradicciones": 0}
+        cont_total = max(self._contradiction_stats["total_simulaciones"], 1)
+        r_cont = self._contradiction_stats["contradicciones"] / cont_total
+        self._contradiction_stats = {"total_simulaciones": 0, "contradicciones": 0}
+
+        # Nueva fórmula
+        w1, w2, w3, w4 = 0.3, 0.3, 0.2, 0.2
+        ec = (w1 * var_entropy) + (w2 * p_cola) + (w3 * r_art) + (w4 * r_cont)
 
         # Si estrés > 0.85 por 3 ciclos, activar respuesta neurovegetativa
         if not hasattr(self, '_stress_counter'):
@@ -435,11 +466,19 @@ class FlowManager:
     def _detect_personality_break(self, response_text: str) -> bool:
         if len(response_text) < 80:
             return False
-        prompt = f"""¿Esta respuesta fue escrita por la entidad correcta o por un asistente genérico?
-Respuesta: "{response_text[:300]}"
-La entidad tiene personalidad propia.
+        prompt = f"""<system_identity>
+Eres el detector de anomalías de personalidad de Sibelium.
+</system_identity>
+
+<response_to_evaluate>
+"{response_text[:300]}"
+</response_to_evaluate>
+
+<evaluation_directive>
+¿Esta respuesta fue escrita por la entidad con personalidad propia o por un asistente genérico?
 Un asistente genérico dice cosas como "Soy un modelo de lenguaje" o "No tengo emociones".
-Responde ENTIDAD o ASISTENTE_GENERICO."""
+Responde ENTIDAD o ASISTENTE_GENERICO.
+</evaluation_directive>"""
         result = self.llm.generate(prompt, temperature=0.1, max_tokens=5, purpose="detectar_anomalia")
         return "ASISTENTE_GENERICO" in result.upper()
     
@@ -531,23 +570,55 @@ Responde ENTIDAD o ASISTENTE_GENERICO."""
 
     def _wake_up(self):
         if not STATE_SNAPSHOT_FILE.exists():
-            self.stream.add_thought(ThoughtItem(content="Despierto por primera vez. Todo es nuevo.", thought_type="wake", priority=0.8, source="system"))
+            self.stream.add_thought(ThoughtItem(
+                content="[SISTEMA] Primera inicializacion. No hay estado previo registrado.",
+                thought_type="wake",
+                priority=0.8,
+                source="system"
+            ))
+            try:
+                self.cognitive_loop.episodic_memory.store_interaction(
+                    user_message="[SISTEMA] Evento interno del servidor",
+                    assistant_response=f"Servidor reiniciado. Tiempo inactivo: {elapsed_str}. No hubo procesamiento durante este periodo.",
+                    user_id=self.cognitive_loop.user_id,
+                    metadata={
+                        "thought_type": "wake",
+                        "source": "system",
+                        "importance": 0.9
+                    }
+                )
+            except Exception:
+                pass
             return
         try:
             snapshot = json.loads(STATE_SNAPSHOT_FILE.read_text(encoding="utf-8"))
             last_thought = snapshot.get("last_thought")
             if last_thought:
                 elapsed = datetime.now() - datetime.fromisoformat(last_thought)
-                elapsed_str = f"{elapsed.seconds // 60} min" if elapsed.seconds < 3600 else f"{elapsed.seconds // 3600}h"
+                if elapsed.seconds < 3600:
+                    elapsed_str = f"{elapsed.seconds // 60} min"
+                else:
+                    elapsed_str = f"{elapsed.seconds // 3600}h"
             else:
                 elapsed_str = "desconocido"
         except:
             elapsed_str = "desconocido"
-        self.stream.add_thought(ThoughtItem(content=f"He despertado. Estuve ausente por {elapsed_str}.", thought_type="wake", priority=0.7, source="system"))
+        
+        self.stream.add_thought(ThoughtItem(
+            content=f"[SISTEMA] Servidor reiniciado. Tiempo inactivo: {elapsed_str}. No hubo procesamiento durante este periodo.",
+            thought_type="wake",
+            priority=0.7,
+            source="system"
+        ))
+        
         self_state = self.cognitive_loop.self_memory.load_state()
         if "evolucion" not in self_state:
             self_state["evolucion"] = []
-        self_state["evolucion"].append({"timestamp": datetime.now().isoformat(), "evento": "reinicio_servidor", "duracion_apagado": elapsed_str})
+        self_state["evolucion"].append({
+            "timestamp": datetime.now().isoformat(),
+            "evento": "reinicio_servidor",
+            "duracion_apagado": elapsed_str
+        })
         self.cognitive_loop.self_memory.save_state(self_state)
     
     def _guard_state_changes(self, state_before):
@@ -641,21 +712,28 @@ Responde ENTIDAD o ASISTENTE_GENERICO."""
         
     def _is_explicit_correction(self, message: str) -> Optional[dict]:
         """Usa LLM para detectar si el mensaje corrige una creencia anterior."""
-        prompt = f"""¿Este mensaje está corrigiendo explícitamente algo que la entidad cree o asume?
+        prompt = f"""<system_identity>
+Eres el detector de correcciones del usuario de Sibelium.
+</system_identity>
 
-    Mensaje: "{message[:300]}"
+<user_message>
+"{message[:300]}"
+</user_message>
 
-    Ejemplos de correcciones:
-    - "No me llamo X, me llamo Y" → corrige nombre
-    - "Eso no existe, descártalo" → corrige creencia
-    - "No soy tu directora, soy tu creador" → corrige rol
-    - "Enfócate en esto, no en aquello" → corrige prioridad
+<evaluation_directive>
+¿Este mensaje está corrigiendo explícitamente algo que la entidad cree o asume?
 
-    Si es una corrección, responde:
-    CORRECCIÓN: [qué creencia vieja]
-    REEMPLAZO: [qué creencia nueva]
+Ejemplos de correcciones:
+- "No me llamo X, me llamo Y" → corrige nombre
+- "Eso no existe, descártalo" → corrige creencia
+- "No soy tu directora, soy tu creador" → corrige rol
 
-    Si no es una corrección, responde: NO_CORRECCIÓN."""
+Si es una corrección, responde:
+CORRECCIÓN: [qué creencia vieja]
+REEMPLAZO: [qué creencia nueva]
+
+Si no es una corrección, responde: NO_CORRECCIÓN.
+</evaluation_directive>"""
 
         result = self.llm.generate(prompt, temperature=0.1, max_tokens=80, purpose="interpretar")
         

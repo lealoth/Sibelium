@@ -21,9 +21,42 @@ if not exist ".venv" (
 :: Activar entorno
 call .venv\Scripts\activate.bat
 
-:: Instalar dependencias
-echo [2/4] Instalando dependencias...
-pip install -r requirements.txt --quiet
+:: Verificar e instalar dependencias
+echo [2/4] Verificando dependencias...
+
+:: Verificar si requirements.txt existe
+if not exist "requirements.txt" (
+    echo [!] requirements.txt no encontrado. Omitiendo verificacion de dependencias.
+    goto :skip_deps
+)
+
+:: Verificar cada dependencia del requirements.txt
+set NEED_INSTALL=0
+for /f "usebackq delims=" %%p in ("requirements.txt") do (
+    :: Saltar líneas vacías y comentarios
+    if not "%%p"=="" (
+        echo %%p | findstr /r "^#" >nul
+        if errorlevel 1 (
+            :: Extraer nombre del paquete (antes de ==, >=, <=, ~=, !=, o espacios)
+            for /f "tokens=1 delims==><~! " %%n in ("%%p") do (
+                pip show %%n >nul 2>&1
+                if errorlevel 1 (
+                    echo   Falta: %%n
+                    set NEED_INSTALL=1
+                )
+            )
+        )
+    )
+)
+
+if %NEED_INSTALL%==1 (
+    echo   Instalando dependencias faltantes...
+    pip install -r requirements.txt --quiet
+) else (
+    echo   Todas las dependencias estan instaladas.
+)
+
+:skip_deps
 
 :: Descargar modelos si no existen
 if not exist "models\Llama-3.1-8B-Instruct-Q4_K_M.gguf" (

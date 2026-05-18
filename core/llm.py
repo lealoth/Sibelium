@@ -28,6 +28,12 @@ PREMIUM_PURPOSES = [
     "analizar_codigo", "analizar_imagen", "auto_mejora",
 ]
 
+# Propósitos que requieren cloud por propensión a alucinación
+ALUCINATION_PRONE_PURPOSES = [
+    "simulacion_fondo",
+    "prospeccion_fondo",
+]
+
 # Todo lo demás va al modelo local
 # (no hace falta lista, por defecto)
 
@@ -151,7 +157,7 @@ class LLMModel:
 
     def _select_backend(self, purpose: str) -> str:
         """Elige backend según el propósito."""
-        if not purpose:
+        if not purpose or LLM_BACKEND == "local":
             return self._fallback_local()
 
         # Cloud premium
@@ -255,32 +261,25 @@ class LLMModel:
             return None
 
     def _thalamic_route(self, prompt: str, purpose: str, context_entropy: float = 0.5) -> str:
-        """
-        Mediador Talámico: decide si una tarea va al modelo local o al cloud
-        basado en la Carga Atencional Esperada (CE), no solo en el propósito.
-        CE = (Largo_Prompt * 0.4) + (Estrés_Cognitivo * 0.4) + (Complejidad_Grafo * 0.2)
-        """
-        # Solo aplicar a tareas que normalmente irían al local
         backend = self._select_backend(purpose)
         if backend not in ("main", "reasoning", "json"):
-            return backend  # Ya va al cloud, no cambiar
+            return backend
 
-        # Si no hay cloud disponible, quedarse en local
         from config import CLOUD_API_KEY, LLM_BACKEND
         if not (CLOUD_API_KEY and LLM_BACKEND in ("cloud", "hybrid")):
             return backend
 
-        # Calcular Carga Atencional Esperada
+        # Forzar cloud para propósitos propensos a alucinación
+        if purpose in ALUCINATION_PRONE_PURPOSES:
+            print(f"   [Talámico] Propósito '{purpose}' → cloud (anti-alucinación)")
+            return "cloud_premium"
+
+        # Cálculo de CE para el resto
         prompt_length = len(prompt)
         max_context = 8192
         prompt_ratio = min(1.0, prompt_length / max_context)
-
-        # Estrés cognitivo (0-1)
         cognitive_stress = getattr(self, '_cognitive_stress', 0.5)
-
-        # Complejidad del grafo (aproximada por entropía)
         graph_complexity = 1.0 - context_entropy
-
         CE = (prompt_ratio * 0.4) + (cognitive_stress * 0.4) + (graph_complexity * 0.2)
 
         if CE > 0.65:
@@ -358,7 +357,7 @@ class LLMModel:
     # ============================================
 
     CACHEABLE = [
-        "reflexion_fondo", "curiosidad_fondo", "evaluar_detector",
+        "curiosidad_fondo", "evaluar_detector",
         "decidir_info", "check_identity", "resumir_contexto",
         "prediccion", "redirigir_pensamiento", "evaluar_diversidad",
         "limpiar_curiosidades", "consolidacion", "regular_emocion",
